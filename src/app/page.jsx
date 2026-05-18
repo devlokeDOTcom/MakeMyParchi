@@ -61,7 +61,7 @@ function HomeContent() {
           </div>
         </div>
         <DashboardTabs />
-        <div className="flex items-end flex-col gap-2">
+        {/* <div className="flex items-end flex-col gap-2">
           <Image
             src="/assets/brand_logo.png"
             alt="Profile Picture"
@@ -69,7 +69,7 @@ function HomeContent() {
             height={100}
             className="grayscale opacity-50"
           />
-        </div>
+        </div> */}
       </div>
       <InvoicePreviewPanel />
     </>
@@ -104,6 +104,7 @@ function DashboardTabs() {
     }
     window.print();
   };
+  const { showPreview, setShowPreview } = useInvoice();
 
   return (
     <Tabs defaultValue="invoice" className="w-full">
@@ -125,33 +126,45 @@ function DashboardTabs() {
               {saveMessage}
             </span>
           ) : null}
-          <ButtonGroup>
-            <Button variant="outline" onClick={handleDownload}>
-              <ArrowDownIcon /> Download
-            </Button>
-            <Button onClick={handlePrint}>
-              <PrinterIcon /> Print Invoice
-            </Button>
-          </ButtonGroup>
-        </div>
-      </div>
-      <TabsContent value="admin" className={""}>
-        <div className="w-full bg-white p-4 border border-black/10 shadow">
-          <BusinessDetails />
-        </div>
-      </TabsContent>
-      <TabsContent value="account" className={""}>
-        <div className="w-full bg-white p-4 border border-black/10 shadow">
-          <AccountDetails />
-        </div>
-      </TabsContent>
-      <TabsContent value="invoice">
-        <div className="w-full flex flex-col gap-5">
-          <div className="w-full bg-white p-4 border border-black/10 shadow">
-            <Invoice />
+          <div className="flex flex-col items-end gap-5">
+            <ButtonGroup>
+              <Button variant="outline" onClick={handleDownload}>
+                <ArrowDownIcon /> Download
+              </Button>
+              <Button onClick={handlePrint}>
+                <PrinterIcon /> Print Invoice
+              </Button>
+            </ButtonGroup>
+            <div className={"gap-2 flex items-center"}>
+              <Switch checked={showPreview} onCheckedChange={setShowPreview} />
+              <Label className={"text-black/50"}>Preview</Label>
+            </div>
           </div>
         </div>
-      </TabsContent>
+      </div>
+      {!showPreview ? (
+        <>
+          <TabsContent value="admin" className={""}>
+            <div className="w-full bg-white p-4 border border-black/10 shadow">
+              <BusinessDetails />
+            </div>
+          </TabsContent>
+          <TabsContent value="account" className={""}>
+            <div className="w-full bg-white p-4 border border-black/10 shadow">
+              <AccountDetails />
+            </div>
+          </TabsContent>
+          <TabsContent value="invoice">
+            <div className="w-full flex flex-col gap-5">
+              <div className="w-full bg-white p-4 border border-black/10 shadow">
+                <Invoice />
+              </div>
+            </div>
+          </TabsContent>
+        </>
+      ) : (
+        ""
+      )}
     </Tabs>
   );
 }
@@ -417,69 +430,63 @@ function Invoice() {
           <CalendarBlankIcon size={30} weight="light" />
           <h1>Invoice Details</h1>
         </span>
-        <div className={"gap-2 flex items-center"}>
-          <Switch checked={showPreview} onCheckedChange={setShowPreview} />
-          <Label>Preview</Label>
+      </div>
+      <div className="w-full flex flex-col gap-5 border rounded shadow p-5 mb-5">
+        <div className="flex flex-wrap gap-2 items-center">
+          <Field>
+            <Label>Invoice Number</Label>
+            <Input
+              placeholder="000/000-000"
+              value={invoiceMeta.invoiceNumber}
+              onChange={(e) =>
+                updateInvoiceMeta("invoiceNumber", e.target.value)
+              }
+            />
+          </Field>
+          <Field>
+            <Label>Invoice Date</Label>
+            <Input
+              type="date"
+              value={invoiceMeta.invoiceDate}
+              onChange={(e) => updateInvoiceMeta("invoiceDate", e.target.value)}
+            />
+          </Field>
+          <Field>
+            <Label>Due Date</Label>
+            <Input
+              type="date"
+              value={invoiceMeta.dueDate}
+              onChange={(e) => updateInvoiceMeta("dueDate", e.target.value)}
+            />
+          </Field>
+        </div>
+        <div className="flex justify-between items-end gap-2 flex-wrap">
+          <Field className={"w-full sm:w-1/3"}>
+            <Label>Order Memo No.</Label>
+            <Input
+              placeholder="ABC/DEF/000-00/00"
+              value={invoiceMeta.memoNo}
+              onChange={(e) => updateInvoiceMeta("memoNo", e.target.value)}
+            />
+          </Field>
+          <Field className={"w-full sm:w-1/3"}>
+            <Label>Order Date</Label>
+            <Input
+              type="date"
+              value={invoiceMeta.orderDate}
+              onChange={(e) => updateInvoiceMeta("orderDate", e.target.value)}
+            />
+          </Field>
+          <SaveActions onSave={persistNow} />
         </div>
       </div>
-      {showPreview ? (
-        <div className="w-full flex-1">
-          <InvoicePreviewPanel />
-        </div>
-      ) : (
-        <>
-          <div className="w-full flex flex-col gap-5 border rounded shadow p-5 mb-5">
-            <div className="flex flex-wrap gap-2 items-center">
-              <Field>
-                <Label>Invoice Number</Label>
-                <Input
-                  placeholder="000/000-000"
-                  value={invoiceMeta.invoiceNumber}
-                  onChange={(e) =>
-                    updateInvoiceMeta("invoiceNumber", e.target.value)
-                  }
-                />
-              </Field>
-              <Field>
-                <Label>Invoice Date</Label>
-                <Input
-                  type="date"
-                  value={invoiceMeta.invoiceDate}
-                  onChange={(e) =>
-                    updateInvoiceMeta("invoiceDate", e.target.value)
-                  }
-                />
-              </Field>
-              <Field>
-                <Label>Due Date</Label>
-                <Input
-                  type="date"
-                  value={invoiceMeta.dueDate}
-                  onChange={(e) => updateInvoiceMeta("dueDate", e.target.value)}
-                />
-              </Field>
-            </div>
-            <div className="flex justify-between items-end gap-2 flex-wrap">
-              <Field className={"w-full sm:w-1/3"}>
-                <Label>Memo No.</Label>
-                <Input
-                  placeholder="ABC/DEF/000-00/00"
-                  value={invoiceMeta.memoNo}
-                  onChange={(e) => updateInvoiceMeta("memoNo", e.target.value)}
-                />
-              </Field>
-              <SaveActions onSave={persistNow} />
-            </div>
-          </div>
-          <span className="flex gap-2 text-lg">
-            <BarcodeIcon size={30} weight="light" />
-            <h1>Line Items</h1>
-          </span>
-          <div className="w-full flex flex-col gap-5 border rounded shadow p-5">
-            <InvoiceDataTable />
-          </div>
-        </>
-      )}
+      <span className="flex gap-2 text-lg">
+        <BarcodeIcon size={30} weight="light" />
+        <h1>Line Items</h1>
+      </span>
+      <div className="w-full flex flex-col gap-5 border rounded shadow p-5">
+        <InvoiceDataTable />
+      </div>
     </div>
   );
 }

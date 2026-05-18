@@ -40,6 +40,7 @@ export function createDefaultInvoiceMeta() {
     invoiceNumber: `INV-${dateStr}-001`,
     invoiceDate: today.toISOString().slice(0, 10),
     dueDate: due.toISOString().slice(0, 10),
+    orderDate: due.toISOString().slice(0, 10),
     memoNo: "",
   };
 }

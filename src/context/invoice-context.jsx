@@ -13,12 +13,13 @@ import { loadInvoiceState, saveInvoiceState } from "@/lib/invoice-storage";
 
 const InvoiceContext = createContext(null);
 
-function calculateLineTotal(qtn, unitPrice, gst = 0) {
+function calculateLineTotal(qtn, unitPrice, gst = 0, discount = 0) {
   const quantity = Number(qtn) || 0;
   const price = Number(unitPrice) || 0;
   const tax = Number(gst) || 0;
   const subtotal = quantity * price;
-  return subtotal + (subtotal * tax) / 100;
+  const subTotalAfterDisc = subtotal - (subtotal * discount) / 100;
+  return subTotalAfterDisc + (subTotalAfterDisc * tax) / 100;
 }
 
 export function InvoiceProvider({ children }) {
@@ -29,7 +30,9 @@ export function InvoiceProvider({ children }) {
   const [invoiceMeta, setInvoiceMeta] = useState(
     () => loadInvoiceState().invoiceMeta,
   );
-  const [lineItems, setLineItems] = useState(() => loadInvoiceState().lineItems);
+  const [lineItems, setLineItems] = useState(
+    () => loadInvoiceState().lineItems,
+  );
   const [showPreview, setShowPreview] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
 
@@ -74,7 +77,8 @@ export function InvoiceProvider({ children }) {
     const qtn = Number(item.qtn);
     const unitPrice = Number(item.unitPrice);
     const gst = Number(item.gst || 0);
-    const totalAmount = calculateLineTotal(qtn, unitPrice, gst);
+    const discount = Number(item.discount || 0);
+    const totalAmount = calculateLineTotal(qtn, unitPrice, gst, discount);
 
     setLineItems((prev) => [
       ...prev,
@@ -84,6 +88,7 @@ export function InvoiceProvider({ children }) {
         qtn,
         unitPrice,
         gst,
+        discount,
         totalAmount,
       },
     ]);
@@ -99,6 +104,7 @@ export function InvoiceProvider({ children }) {
           key === "qtn" ? value : updated.qtn,
           key === "unitPrice" ? value : updated.unitPrice,
           key === "gst" ? value : updated.gst,
+          key === "discount" ? value : updated.discount,
         );
         return updated;
       }),

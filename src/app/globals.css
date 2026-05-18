@@ -124,9 +124,9 @@
   body {
     @apply bg-background text-foreground;
   }
-  html {
+  /* html {
     @apply font-mono;
-  }
+  } */
 }
 
 @media print {

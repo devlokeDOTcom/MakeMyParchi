@@ -14,15 +14,16 @@ import { PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import { numberToWords } from "@/lib/utils";
 import { useInvoice } from "@/context/invoice-context";
 
-function calculateDraftTotal(qtn, unitPrice, gst) {
+function calculateDraftTotal(qtn, unitPrice, gst, discount) {
   const quantity = Number(qtn) || 0;
   const price = Number(unitPrice) || 0;
   const tax = Number(gst) || 0;
   const subtotal = quantity * price;
-  return subtotal + (subtotal * tax) / 100;
+  const subTotalAfterDisc = subtotal - (subtotal * discount) / 100;
+  return subTotalAfterDisc + (subTotalAfterDisc * tax) / 100;
 }
 
-export function InvoiceDataTable() {
+export function InvoiceDataTable(options) {
   const {
     lineItems,
     totalAmount,
@@ -36,6 +37,7 @@ export function InvoiceDataTable() {
     qtn: "",
     unitPrice: "",
     gst: "",
+    discount: "",
   });
 
   const handleAddInvoiceItem = () => {
@@ -54,6 +56,7 @@ export function InvoiceDataTable() {
       qtn: "",
       unitPrice: "",
       gst: "",
+      discount: "",
     });
   };
 
@@ -61,6 +64,7 @@ export function InvoiceDataTable() {
     invoiceDetails.qtn,
     invoiceDetails.unitPrice,
     invoiceDetails.gst,
+    invoiceDetails.discount,
   );
 
   return (
@@ -75,7 +79,12 @@ export function InvoiceDataTable() {
           <TableHead className={"min-w-[100px] text-center"}>
             Unit Price
           </TableHead>
-          <TableHead className={"min-w-[50px] text-center"}>GST</TableHead>
+          <TableHead className={"min-w-[100px] text-center"}>
+            Discount (%)
+          </TableHead>
+          <TableHead className={"min-w-[50px] text-center"}>
+            GST ( % )
+          </TableHead>
           <TableHead className={"min-w-[100px] text-center"}>
             Total Amount
           </TableHead>
@@ -94,11 +103,7 @@ export function InvoiceDataTable() {
               <Input
                 value={invoiceDetail.desc}
                 onChange={(event) =>
-                  updateLineItem(
-                    invoiceDetail.id,
-                    "desc",
-                    event.target.value,
-                  )
+                  updateLineItem(invoiceDetail.id, "desc", event.target.value)
                 }
               />
             </TableCell>
@@ -127,6 +132,20 @@ export function InvoiceDataTable() {
               />
             </TableCell>
 
+            <TableCell className="min-w-[150px] text-center">
+              <Input
+                type="number"
+                value={invoiceDetail.discount}
+                onChange={(event) =>
+                  updateLineItem(
+                    invoiceDetail.id,
+                    "discount",
+                    event.target.value,
+                  )
+                }
+              />
+            </TableCell>
+
             <TableCell className="min-w-[100px] text-center">
               <Input
                 type="number"
@@ -136,9 +155,8 @@ export function InvoiceDataTable() {
                 }
               />
             </TableCell>
-
             <TableCell className="min-w-[150px] text-center">
-              ₹ {invoiceDetail.totalAmount}
+              ₹ {Math.round(invoiceDetail.totalAmount)}
             </TableCell>
 
             <TableCell className="text-center">
@@ -204,6 +222,20 @@ export function InvoiceDataTable() {
 
           <TableCell className={"min-w-[100px] text-center"}>
             <Input
+              placeholder="00"
+              value={invoiceDetails.discount}
+              type={"number"}
+              onChange={(event) => {
+                setInvoiceDetails({
+                  ...invoiceDetails,
+                  discount: event.target.value,
+                });
+              }}
+              className={"rounded shadow "}
+            />
+          </TableCell>
+          <TableCell className={"min-w-[100px] text-center"}>
+            <Input
               placeholder="00 %"
               value={invoiceDetails.gst}
               type={"number"}
@@ -218,14 +250,14 @@ export function InvoiceDataTable() {
           </TableCell>
 
           <TableCell className={"min-w-[150px] text-center"}>
-            ₹ {draftTotal}
+            ₹ {Math.round(draftTotal)}
           </TableCell>
 
           <TableCell />
         </TableRow>
 
         <TableRow>
-          <TableCell colSpan={7} className="text-right">
+          <TableCell colSpan={8} className="text-right">
             <Button
               variant="secondary"
               className={"border border-black/20 shadow"}
@@ -239,12 +271,14 @@ export function InvoiceDataTable() {
 
       <TableFooter>
         <TableRow>
-          <TableCell colSpan={6}>Total</TableCell>
-          <TableCell className="text-right">₹ {totalAmount}</TableCell>
+          <TableCell colSpan={7}>Total</TableCell>
+          <TableCell className="text-right">
+            ₹ {Math.round(totalAmount)}
+          </TableCell>
         </TableRow>
 
         <TableRow>
-          <TableCell colSpan={4}>Amount in words</TableCell>
+          <TableCell colSpan={5}>Amount in words</TableCell>
           <TableCell colSpan={3} className="text-right">
             {numberToWords(totalAmount)
               .toLowerCase()
