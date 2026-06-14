@@ -13,13 +13,24 @@ import { loadInvoiceState, saveInvoiceState } from "@/lib/invoice-storage";
 
 const InvoiceContext = createContext(null);
 
-function calculateLineTotal(qtn, unitPrice, gst = 0, discount = 0) {
+function calculateLineTotal(qtn, unitPrice, gst = 0) {
   const quantity = Number(qtn) || 0;
   const price = Number(unitPrice) || 0;
   const tax = Number(gst) || 0;
   const subtotal = quantity * price;
-  const subTotalAfterDisc = subtotal - (subtotal * discount) / 100;
-  return subTotalAfterDisc + (subTotalAfterDisc * tax) / 100;
+  return subtotal + (subtotal * tax) / 100;
+}
+function calculateLineTotalTaxableAmount(qtn, unitPrice) {
+  const quantity = Number(qtn) || 0;
+  const price = Number(unitPrice) || 0;
+
+  return price * quantity;
+}
+function calculateLineTotalGSTvalue(qtn, unitPrice, gst = 0) {
+  const quantity = Number(qtn) || 0;
+  const price = Number(unitPrice) || 0;
+  const tax = Number(gst) || 0;
+  return (quantity * price * tax) / 100;
 }
 
 export function InvoiceProvider({ children }) {
@@ -57,6 +68,20 @@ export function InvoiceProvider({ children }) {
     [lineItems],
   );
 
+  const totalGSTValue = useMemo(
+    () =>
+      lineItems.reduce((acc, item) => acc + Number(item.totalGSTValue || 0), 0),
+    [lineItems],
+  );
+  const totalTaxableAmount = useMemo(
+    () =>
+      lineItems.reduce(
+        (acc, item) => acc + Number(item.totalTaxableAmount || 0),
+        0,
+      ),
+    [lineItems],
+  );
+
   const updateBusiness = useCallback((key, value) => {
     setBusiness((prev) => ({ ...prev, [key]: value }));
   }, []);
@@ -79,6 +104,8 @@ export function InvoiceProvider({ children }) {
     const gst = Number(item.gst || 0);
     const discount = Number(item.discount || 0);
     const totalAmount = calculateLineTotal(qtn, unitPrice, gst, discount);
+    const totalTaxableAmount = calculateLineTotalTaxableAmount(qtn, unitPrice);
+    const totalGSTValue = calculateLineTotalGSTvalue(qtn, unitPrice, gst);
 
     setLineItems((prev) => [
       ...prev,
@@ -88,8 +115,9 @@ export function InvoiceProvider({ children }) {
         qtn,
         unitPrice,
         gst,
-        discount,
         totalAmount,
+        totalTaxableAmount,
+        totalGSTValue,
       },
     ]);
   }, []);
@@ -104,7 +132,15 @@ export function InvoiceProvider({ children }) {
           key === "qtn" ? value : updated.qtn,
           key === "unitPrice" ? value : updated.unitPrice,
           key === "gst" ? value : updated.gst,
-          key === "discount" ? value : updated.discount,
+        );
+        updated.totalGSTValue = calculateLineTotalGSTvalue(
+          key === "qtn" ? value : updated.qtn,
+          key === "unitPrice" ? value : updated.unitPrice,
+          key === "gst" ? value : updated.gst,
+        );
+        updated.totalTaxableAmount = calculateLineTotalTaxableAmount(
+          key === "qtn" ? value : updated.qtn,
+          key === "unitPrice" ? value : updated.unitPrice,
         );
         return updated;
       }),
@@ -140,8 +176,19 @@ export function InvoiceProvider({ children }) {
       invoiceMeta,
       lineItems,
       totalAmount,
+      totalGSTValue,
+      totalTaxableAmount,
     }),
-    [business, bank, customer, invoiceMeta, lineItems, totalAmount],
+    [
+      business,
+      bank,
+      customer,
+      invoiceMeta,
+      lineItems,
+      totalAmount,
+      totalTaxableAmount,
+      totalGSTValue,
+    ],
   );
 
   const value = useMemo(
@@ -155,6 +202,8 @@ export function InvoiceProvider({ children }) {
       showPreview,
       setShowPreview,
       totalAmount,
+      totalTaxableAmount,
+      totalGSTValue,
       saveMessage,
       invoiceData,
       updateBusiness,
@@ -176,6 +225,8 @@ export function InvoiceProvider({ children }) {
       lineItems,
       showPreview,
       totalAmount,
+      totalTaxableAmount,
+      totalGSTValue,
       saveMessage,
       invoiceData,
       updateBusiness,

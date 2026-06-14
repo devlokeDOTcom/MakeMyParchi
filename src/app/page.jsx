@@ -128,12 +128,12 @@ function DashboardTabs() {
           ) : null}
           <div className="flex flex-col items-end gap-5">
             <ButtonGroup>
-              <Button variant="outline" onClick={handleDownload}>
+              <Button onClick={handleDownload}>
                 <ArrowDownIcon /> Download
               </Button>
-              <Button onClick={handlePrint}>
+              {/* <Button onClick={handlePrint}>
                 <PrinterIcon /> Print Invoice
-              </Button>
+              </Button> */}
             </ButtonGroup>
             <div className={"gap-2 flex items-center"}>
               <Switch checked={showPreview} onCheckedChange={setShowPreview} />
@@ -449,14 +449,6 @@ function Invoice() {
               type="date"
               value={invoiceMeta.invoiceDate}
               onChange={(e) => updateInvoiceMeta("invoiceDate", e.target.value)}
-            />
-          </Field>
-          <Field>
-            <Label>Due Date</Label>
-            <Input
-              type="date"
-              value={invoiceMeta.dueDate}
-              onChange={(e) => updateInvoiceMeta("dueDate", e.target.value)}
             />
           </Field>
         </div>

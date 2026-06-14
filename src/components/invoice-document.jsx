@@ -36,38 +36,31 @@ export function InvoiceDocument({
   let netWithOutTax = 0;
   let grossWithTax = 0;
   let totalTax = 0;
-  let getTotal = (type) => {
-    if (lineItems) {
-      if (type === "net") {
-        for (let i = 0; i < lineItems.length; i++) {
-          let subTotal = lineItems[i].unitPrice * lineItems[i].qtn;
-          let afterDiscount =
-            subTotal - (subTotal * lineItems[i].discount) / 100;
-          netWithOutTax += afterDiscount;
-        }
-        return netWithOutTax;
-      }
-      if (type === "gross") {
-        for (let i = 0; i < lineItems.length; i++) {
-          let subTotal = lineItems[i].unitPrice * lineItems[i].qtn;
-          let afterDiscount =
-            subTotal - (subTotal * lineItems[i].discount) / 100;
-          grossWithTax +=
-            afterDiscount + (afterDiscount * lineItems[i].gst) / 100;
-        }
-        return grossWithTax;
-      }
-      if (type === "tax") {
-        for (let i = 0; i < lineItems.length; i++) {
-          let subTotal = lineItems[i].unitPrice * lineItems[i].qtn;
-          let afterDiscount =
-            subTotal - (subTotal * lineItems[i].discount) / 100;
-          totalTax += (afterDiscount * lineItems[i].gst) / 100;
-        }
-        return totalTax;
-      }
+  const getTotal = (type) => {
+    let value = 0;
+    if (!(lineItems.length > 0)) {
+      return 0;
     }
-    return 0;
+    if (type === "TA") {
+      lineItems?.forEach((element) => {
+        value += element.qtn * element.unitPrice;
+      });
+    }
+
+    if (type === "GST") {
+      lineItems?.forEach((element) => {
+        value += (element.qtn * element.unitPrice * element.gst) / 100;
+      });
+    }
+    if (type === "NET") {
+      lineItems?.forEach((element) => {
+        value +=
+          (element.qtn * element.unitPrice * element.gst) / 100 +
+          element.qtn * element.unitPrice;
+      });
+    }
+
+    return value;
   };
   return (
     <div
@@ -129,11 +122,6 @@ export function InvoiceDocument({
             <br />
             {formatDate(invoiceMeta.invoiceDate)}
           </p>
-          <p className="mt-2">
-            <span className="text-black/50">Due Date</span>
-            <br />
-            {formatDate(invoiceMeta.dueDate)}
-          </p>
         </section>
       </header>
 
@@ -170,16 +158,17 @@ export function InvoiceDocument({
         </div>
       </section>
 
-      <table className="w-full border-collapse text-sm">
+      <table className="w-full border-collapse text-xs">
         <thead>
           <tr className="bg-black/[3%] border-y border-black/10">
-            <th className="p-2 text-left w-12">SL No.</th>
-            <th className="p-2 text-left">Description</th>
-            <th className="p-2 text-center w-16">Qty</th>
-            <th className="p-2 text-right w-24">Unit Price</th>
-            <th className="p-2 text-center w-16 text-nowrap">Discount (%)</th>
-            <th className="p-2 text-center w-16 text-nowrap">GST (%)</th>
-            <th className="p-2 text-right w-28">Amount</th>
+            <th className="p-2 text-left w-12 px-4">SL No.</th>
+            <th className="p-2 flex-1 text-left px-4">Description</th>
+            <th className="p-2 text-center w-16 px-4">Qty</th>
+            <th className="p-2 text-right w-24 px-4">Unit Price</th>
+            <th className="p-2 text-center w-32 px-4">Taxable Amount</th>
+            <th className="p-2 text-center w-16 text-nowrap px-4">GST (%)</th>
+            <th className="p-2 text-center w-16 text-nowrap px-4">GST Value</th>
+            <th className="p-2 text-right w-28 px-4">Amount</th>
           </tr>
         </thead>
         <tbody>
@@ -193,13 +182,20 @@ export function InvoiceDocument({
                   ₹ {formatCurrency(Math.round(item.unitPrice))}
                 </td>
                 <td className="p-2 text-center">
-                  {item.discount ? `${item.discount}%` : "—"}
+                  {item.qtn && item.unitPrice
+                    ? `₹ ${(item.qtn * item.unitPrice).toFixed(2)}`
+                    : "—"}
                 </td>
                 <td className="p-2 text-center">
                   {item.gst ? `${item.gst}%` : "—"}
                 </td>
+                <td className="p-2 text-center">
+                  {item.gst
+                    ? `₹ ${((item.gst * item.qtn * item.unitPrice) / 100).toFixed(2)}`
+                    : "—"}
+                </td>
                 <td className="p-2 text-right">
-                  ₹ {formatCurrency(Math.round(item.totalAmount))}
+                  ₹ {item?.totalAmount.toFixed(2)}
                 </td>
               </tr>
             ))
@@ -213,41 +209,42 @@ export function InvoiceDocument({
         </tbody>
         <tfoot>
           <tr className="border-t border-black/10 font-semibold">
-            <td colSpan={4} className="p-3 text-right">
-              Net Total
+            <td colSpan={4} className="p-3 text-right border-r">
+              Total :
             </td>
-            <td className="p-3 text-right">
-              ₹ {formatCurrency(getTotal("net"))}
-            </td>
-            <td className="p-3 text-right"></td>
-          </tr>
-          <tr className="border-t border-black/10 font-semibold">
-            <td colSpan={4} className="p-3 text-right">
-              Taxes{" "}
-              <span className="text-xs italic font-light mx-2">
-                (CGST + SGST)
-              </span>
-            </td>
-            <td className="p-3 text-right">
-              ₹ {formatCurrency(getTotal("tax"))}
+            <td className="p-3 text-center border-r">
+              ₹ {getTotal("TA")?.toFixed(2)}
             </td>
             <td className="p-3 text-right"></td>
-          </tr>
-          <tr className="border-t border-black/10 font-semibold">
-            <td colSpan={6} className="p-3 text-right">
-              Gross Total{" "}
-              <span className="text-xs italic font-light mx-2">(Payable)</span>
+            <td className="p-3 text-right border-x">
+              ₹ {getTotal("GST")?.toFixed(2)}
             </td>
-            <td className="p-3 text-right">
-              ₹ {formatCurrency(getTotal("gross"))}
+            <td className="p-3 text-right">₹ {getTotal("NET")?.toFixed(2)}</td>
+          </tr>
+
+          <tr className="border-y">
+            <td colSpan={7} className="p-3 text-right italic border-r">
+              Round off :
+            </td>
+            <td colSpan={1} className="p-3 text-right italic">
+              ₹{" "}
+              {(
+                Math.ceil(getTotal("NET")) - getTotal("NET").toFixed(2)
+              ).toFixed(2)}
             </td>
           </tr>
           <tr className="border-y">
-            <td colSpan={2} className="p-3 text-black/60">
-              Amount in words
+            <td colSpan={5} className="p-3 text-slate-500 border-r">
+              Amount in words :{" "}
+              <span className="text-right text-slate-900 pl-5">
+                {amountWords} rupees only
+              </span>
             </td>
-            <td colSpan={5} className="p-3 text-right">
-              {amountWords} rupees only
+            <td colSpan={2} className="p-3 text-right font-bold border-r">
+              Amount to pay :
+            </td>
+            <td colSpan={1} className="p-3 text-right font-bold text-[14px]">
+              ₹ {Math.ceil(getTotal("NET"))?.toFixed(2)}
             </td>
           </tr>
         </tfoot>
@@ -280,7 +277,7 @@ export function InvoiceDocument({
         </div>
       </div>
       <div className="w-full mt-6">
-        <p className="text-slate-500 text-xs w-full mb-2 italic">
+        <p className="text-slate-500 text-sm w-full mb-2 italic">
           {"This is Challan cum Tax invoice. No separate Challan is required"}
         </p>
         <p className="text-black/30 text-xs">

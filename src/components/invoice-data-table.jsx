@@ -14,19 +14,20 @@ import { PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import { numberToWords } from "@/lib/utils";
 import { useInvoice } from "@/context/invoice-context";
 
-function calculateDraftTotal(qtn, unitPrice, gst, discount) {
+function calculateDraftTotal(qtn, unitPrice, gst) {
   const quantity = Number(qtn) || 0;
   const price = Number(unitPrice) || 0;
   const tax = Number(gst) || 0;
   const subtotal = quantity * price;
-  const subTotalAfterDisc = subtotal - (subtotal * discount) / 100;
-  return subTotalAfterDisc + (subTotalAfterDisc * tax) / 100;
+  return (subtotal * tax) / 100 + subtotal;
 }
 
 export function InvoiceDataTable(options) {
   const {
     lineItems,
     totalAmount,
+    totalGSTValue,
+    totalTaxableAmount,
     addLineItem,
     updateLineItem,
     removeLineItem,
@@ -37,7 +38,7 @@ export function InvoiceDataTable(options) {
     qtn: "",
     unitPrice: "",
     gst: "",
-    discount: "",
+    gstValue: "",
   });
 
   const handleAddInvoiceItem = () => {
@@ -55,8 +56,9 @@ export function InvoiceDataTable(options) {
       desc: "",
       qtn: "",
       unitPrice: "",
+      taxableAmount: "",
       gst: "",
-      discount: "",
+      gstValue: "",
     });
   };
 
@@ -64,35 +66,26 @@ export function InvoiceDataTable(options) {
     invoiceDetails.qtn,
     invoiceDetails.unitPrice,
     invoiceDetails.gst,
-    invoiceDetails.discount,
   );
 
   return (
     <Table className="">
       <TableHeader className="bg-black/[3%]">
         <TableRow>
-          <TableHead className={"min-w-[50px]"}>SL No.</TableHead>
-          <TableHead className={"items-start w-full"}>
-            Item Description
-          </TableHead>
-          <TableHead className={"text-center"}>QTN</TableHead>
-          <TableHead className={"min-w-[100px] text-center"}>
-            Unit Price
-          </TableHead>
-          <TableHead className={"min-w-[100px] text-center"}>
-            Discount (%)
-          </TableHead>
-          <TableHead className={"min-w-[50px] text-center"}>
-            GST ( % )
-          </TableHead>
-          <TableHead className={"min-w-[100px] text-center"}>
-            Total Amount
-          </TableHead>
+          <TableHead className={""}>SL No.</TableHead>
+          <TableHead className={"items-start"}>Item Description</TableHead>
+          <TableHead className={"text-center min-w-[50px]"}>QTN</TableHead>
+          <TableHead className={"text-center"}>Unit Price</TableHead>
+          <TableHead className={"text-center"}>Taxable Amount</TableHead>
+          <TableHead className={"text-center"}>GST ( % )</TableHead>
+          <TableHead className={"text-center"}>GST Value</TableHead>
+          <TableHead className={"text-center"}>Total Amount</TableHead>
           <TableHead className={"text-center"}>Action</TableHead>
         </TableRow>
       </TableHeader>
 
       <TableBody>
+        {/* Data show field  */}
         {lineItems.map((invoiceDetail, index) => (
           <TableRow key={invoiceDetail.id}>
             <TableCell className="min-w-[50px] text-center">
@@ -132,21 +125,13 @@ export function InvoiceDataTable(options) {
               />
             </TableCell>
 
-            <TableCell className="min-w-[150px] text-center">
-              <Input
-                type="number"
-                value={invoiceDetail.discount}
-                onChange={(event) =>
-                  updateLineItem(
-                    invoiceDetail.id,
-                    "discount",
-                    event.target.value,
-                  )
-                }
-              />
+            <TableCell className="min-w-[100px] text-center">
+              <p className="w-full">
+                ₹ {(invoiceDetail.qtn * invoiceDetail.unitPrice).toFixed(2)}
+              </p>
             </TableCell>
 
-            <TableCell className="min-w-[100px] text-center">
+            <TableCell className="max-w-fit min-w-[100px] text-center">
               <Input
                 type="number"
                 value={invoiceDetail.gst}
@@ -155,8 +140,17 @@ export function InvoiceDataTable(options) {
                 }
               />
             </TableCell>
-            <TableCell className="min-w-[150px] text-center">
-              ₹ {Math.round(invoiceDetail.totalAmount)}
+            <TableCell className="text-center">
+              ₹{" "}
+              {(
+                (invoiceDetail.qtn *
+                  invoiceDetail.unitPrice *
+                  invoiceDetail.gst) /
+                100
+              ).toFixed(2)}
+            </TableCell>
+            <TableCell className="min-w-[100px] text-center">
+              ₹ {invoiceDetail.totalAmount.toFixed(2)}
             </TableCell>
 
             <TableCell className="text-center">
@@ -171,8 +165,9 @@ export function InvoiceDataTable(options) {
           </TableRow>
         ))}
 
+        {/* Data Input field  */}
         <TableRow>
-          <TableCell className={"min-w-[50px] text-center"}>
+          <TableCell className={"text-center"}>
             {lineItems.length + 1}
           </TableCell>
 
@@ -190,7 +185,7 @@ export function InvoiceDataTable(options) {
             />
           </TableCell>
 
-          <TableCell className={"min-w-[100px] text-center"}>
+          <TableCell className={"text-center min-w-[100px]"}>
             <Input
               placeholder="00"
               value={invoiceDetails.qtn}
@@ -205,7 +200,7 @@ export function InvoiceDataTable(options) {
             />
           </TableCell>
 
-          <TableCell className={"min-w-[100px] text-center"}>
+          <TableCell className={"text-center min-w-[100px]"}>
             <Input
               placeholder="₹ 00"
               value={invoiceDetails.unitPrice}
@@ -220,21 +215,10 @@ export function InvoiceDataTable(options) {
             />
           </TableCell>
 
-          <TableCell className={"min-w-[100px] text-center"}>
-            <Input
-              placeholder="00"
-              value={invoiceDetails.discount}
-              type={"number"}
-              onChange={(event) => {
-                setInvoiceDetails({
-                  ...invoiceDetails,
-                  discount: event.target.value,
-                });
-              }}
-              className={"rounded shadow "}
-            />
+          <TableCell className={"text-center"}>
+            <p> ₹{invoiceDetails.qtn * invoiceDetails.unitPrice}</p>
           </TableCell>
-          <TableCell className={"min-w-[100px] text-center"}>
+          <TableCell className={"text-center min-w-[100px]"}>
             <Input
               placeholder="00 %"
               value={invoiceDetails.gst}
@@ -249,21 +233,27 @@ export function InvoiceDataTable(options) {
             />
           </TableCell>
 
-          <TableCell className={"min-w-[150px] text-center"}>
-            ₹ {Math.round(draftTotal)}
+          <TableCell className={"text-center"}>
+            ₹{" "}
+            {(
+              (invoiceDetails.qtn *
+                invoiceDetails.unitPrice *
+                invoiceDetails.gst) /
+              100
+            ).toFixed(2)}
           </TableCell>
 
-          <TableCell />
-        </TableRow>
+          <TableCell className={"text-center"}>
+            ₹ {draftTotal.toFixed(2)}
+          </TableCell>
 
-        <TableRow>
-          <TableCell colSpan={8} className="text-right">
+          <TableCell className={"text-center"}>
             <Button
               variant="secondary"
               className={"border border-black/20 shadow"}
               onClick={handleAddInvoiceItem}
             >
-              <PlusIcon /> Add Item
+              <PlusIcon /> Add
             </Button>
           </TableCell>
         </TableRow>
@@ -271,18 +261,51 @@ export function InvoiceDataTable(options) {
 
       <TableFooter>
         <TableRow>
-          <TableCell colSpan={7}>Total</TableCell>
-          <TableCell className="text-right">
-            ₹ {Math.round(totalAmount)}
+          <TableCell colSpan={4} className="text-right">
+            Total :
           </TableCell>
+          <TableCell className="text-center border-x border-slate-300">
+            ₹ {totalTaxableAmount.toFixed(2)}
+          </TableCell>
+          <TableCell className=""></TableCell>
+          <TableCell className="text-center border-x border-slate-300">
+            ₹ {totalGSTValue.toFixed(2)}
+          </TableCell>
+          <TableCell className="text-center border-x border-slate-300">
+            ₹ {totalAmount.toFixed(2)}
+          </TableCell>
+          <TableCell className=""></TableCell>
         </TableRow>
 
         <TableRow>
-          <TableCell colSpan={5}>Amount in words</TableCell>
-          <TableCell colSpan={3} className="text-right">
-            {numberToWords(totalAmount)
+          <TableCell colSpan={7} className={"text-right border-r"}>
+            Round off :{" "}
+          </TableCell>
+          <TableCell className="text-center border-r">
+            ₹{" "}
+            {(
+              Math.ceil(totalAmount.toFixed(2)) - totalAmount.toFixed(2)
+            ).toFixed(2)}
+          </TableCell>
+          <TableCell className=""></TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell colSpan={7} className={"text-right border-r"}>
+            Amount to Pay :{" "}
+          </TableCell>
+          <TableCell className="text-center border-r">
+            ₹ {Math.ceil(totalAmount.toFixed(2)).toFixed(2)}
+          </TableCell>
+          <TableCell className=""></TableCell>
+        </TableRow>
+        <TableRow>
+          <TableCell colSpan={9} className="text-right italic">
+            Amount in words:
+            <span className="px-2"></span>
+            {numberToWords(Math.ceil(totalAmount.toFixed(2)))
               .toLowerCase()
-              .replace(/(^\s*\w|[.!?]\s*\w)/g, (c) => c.toUpperCase())}
+              .replace(/(^\s*\w|[.!?]\s*\w)/g, (c) => c.toUpperCase())}{" "}
+            rupees
           </TableCell>
         </TableRow>
       </TableFooter>

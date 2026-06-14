@@ -44,19 +44,6 @@ const tens = [
   "ninety",
 ];
 
-const thousands = ["", "thousand", "million", "billion"];
-
-/**
- * Examples:
- * 1        -> one
- * 25       -> twenty five
- * 100      -> one hundred
- * 1250     -> one thousand two hundred fifty
- * 1.3      -> one point three
- * 12.45    -> twelve point forty five
- * 105.99   -> one hundred five point ninety nine
- */
-
 export function numberToWords(number) {
   if (number === 0) return "zero";
 
@@ -66,39 +53,50 @@ export function numberToWords(number) {
 
   const [integerPart, decimalPart] = number.toString().split(".");
 
-  let words = convertIntegerToWords(parseInt(integerPart, 10));
+  let words = convertIndianNumberToWords(parseInt(integerPart, 10));
 
-  // Handle decimal part as full number
   if (decimalPart) {
     const decimalNumber = parseInt(decimalPart, 10);
 
-    words += ` point ${convertIntegerToWords(decimalNumber)}`;
+    if (!isNaN(decimalNumber) && decimalNumber > 0) {
+      words += ` point ${convertIndianNumberToWords(decimalNumber)}`;
+    }
   }
 
   return words.replace(/\s+/g, " ").trim();
 }
 
-function convertIntegerToWords(num) {
+function convertIndianNumberToWords(num) {
   if (num === 0) return "zero";
 
-  let word = "";
-  let thousandIndex = 0;
+  let result = "";
 
-  while (num > 0) {
-    if (num % 1000 !== 0) {
-      word = `${convertHundreds(
-        num % 1000,
-      )} ${thousands[thousandIndex]} ${word}`.trim();
+  const units = [
+    { value: 1000000000000, label: "kharab" },
+    { value: 10000000000, label: "arab" },
+    { value: 10000000, label: "crore" },
+    { value: 100000, label: "lakh" },
+    { value: 1000, label: "thousand" },
+  ];
+
+  for (const unit of units) {
+    if (num >= unit.value) {
+      const quotient = Math.floor(num / unit.value);
+
+      result += `${convertBelowThousand(quotient)} ${unit.label} `;
+
+      num %= unit.value;
     }
-
-    num = Math.floor(num / 1000);
-    thousandIndex++;
   }
 
-  return word.replace(/\s+/g, " ").trim();
+  if (num > 0) {
+    result += convertBelowThousand(num);
+  }
+
+  return result.trim();
 }
 
-function convertHundreds(num) {
+function convertBelowThousand(num) {
   let result = "";
 
   if (num >= 100) {
