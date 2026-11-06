@@ -5,6 +5,7 @@ import {
   calculateLineAmounts,
   formatCurrency,
   formatDate,
+  formatRoundOff,
   summarizeLineItems,
 } from "@/lib/invoice-calc";
 import { cn, numberToWords } from "@/lib/utils";
@@ -111,11 +112,11 @@ function InvoiceCustomer({ customer, invoiceMeta }) {
   );
 }
 
-function InvoiceFooter({ bank, pageNumber, pageCount }) {
+function InvoiceFooter({ bank, pageNumber, pageCount, showBank }) {
   return (
     <footer className="mt-4 border-t border-black/10 pt-4">
       <div className="w-full flex gap-10">
-        {bank.bankName || bank.accountNo || bank.ifsc ? (
+        {showBank && (bank.bankName || bank.accountNo || bank.ifsc) ? (
           <section className="w-1/2">
             <p className="text-xs uppercase tracking-wider text-black/50 mb-2">
               Bank Details
@@ -251,7 +252,7 @@ function InvoiceItemsTable({ rows, startIndex, summary, showTotals, isEmpty }) {
               Round off :
             </td>
             <td className="p-3 text-right italic">
-              ₹ {summary.roundOff.toFixed(2)}
+              {formatRoundOff(summary.roundOff)}
             </td>
           </tr>
           <tr className="border-y">
@@ -286,15 +287,15 @@ function outerHeight(element) {
 
 /**
  * Splits rows into pages given measured heights. The header and footer are
- * repeated on every page, "Bill To" only sits on page 1 and the totals only on
- * the last page.
+ * repeated on every page, "Bill To" only sits on page 1, and the totals and
+ * bank details only on the last page (which therefore has a taller footer).
  * @returns {number[][]} row indices per page
  */
 function paginate(rowHeights, m) {
-  const bodyHeight = (isFirst) =>
+  const bodyHeight = (isFirst, isLast = false) =>
     m.pageInner -
     m.header -
-    m.footer -
+    (isLast ? m.footerLast : m.footer) -
     (isFirst ? m.customer : 0) -
     m.thead -
     BODY_BUFFER;
@@ -316,8 +317,9 @@ function paginate(rowHeights, m) {
   });
   pages.push(current);
 
-  // Totals must fit on the last page; otherwise carry one row over with them.
-  if (used + m.tfoot > available) {
+  // Totals and the taller last-page footer must fit; otherwise carry one row
+  // over to a new last page.
+  if (used + m.tfoot > bodyHeight(pages.length === 1, true)) {
     if (current.length > 1) {
       pages.push([current.pop()]);
     } else {
@@ -360,6 +362,7 @@ export function InvoiceDocument({
           pageInner: pageHeight - PAGE_PADDING * 2,
           header: outerHeight(pick("header")),
           footer: outerHeight(pick("footer")),
+          footerLast: outerHeight(pick("footer-last")),
           customer: outerHeight(pick("customer")),
           thead: sandbox.querySelector("thead").getBoundingClientRect().height,
           tfoot: sandbox.querySelector("tfoot").getBoundingClientRect().height,
@@ -418,6 +421,9 @@ export function InvoiceDocument({
         <div data-measure="footer">
           <InvoiceFooter bank={bank} pageNumber={1} pageCount={2} />
         </div>
+        <div data-measure="footer-last">
+          <InvoiceFooter bank={bank} pageNumber={2} pageCount={2} showBank />
+        </div>
       </div>
 
       {pages.map((indices, pageIndex) => {
@@ -459,6 +465,7 @@ export function InvoiceDocument({
                 bank={bank}
                 pageNumber={pageIndex + 1}
                 pageCount={pages.length}
+                showBank={isLast}
               />
             </div>
           </div>

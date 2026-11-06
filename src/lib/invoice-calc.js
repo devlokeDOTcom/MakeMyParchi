@@ -25,14 +25,16 @@ export function summarizeLineItems(lineItems = []) {
     total += line.total;
   }
 
+  // Round the grand total (never individual lines) to the nearest rupee:
+  // .50 and above goes up, below .50 goes down.
   const rounded = Number(total.toFixed(2));
-  const payable = Math.ceil(rounded);
+  const payable = Math.round(rounded);
 
   return {
     taxable,
     gstValue,
     total: rounded,
-    roundOff: payable - rounded,
+    roundOff: Number((payable - rounded).toFixed(2)) || 0,
     payable,
   };
 }
@@ -48,6 +50,12 @@ export function validateInvoiceForExport({ lineItems, business }) {
   }
 
   return errors;
+}
+
+/** "+ ₹ 0.37", "- ₹ 0.12" or "₹ 0.00". */
+export function formatRoundOff(value) {
+  if (!value) return "₹ 0.00";
+  return `${value < 0 ? "-" : "+"} ₹ ${Math.abs(value).toFixed(2)}`;
 }
 
 export function formatCurrency(amount) {

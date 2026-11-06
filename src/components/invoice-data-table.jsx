@@ -12,6 +12,7 @@ import { Input } from "./ui/input";
 import { Button } from "./ui/button";
 import { PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import { numberToWords } from "@/lib/utils";
+import { formatRoundOff, summarizeLineItems } from "@/lib/invoice-calc";
 import { useInvoice } from "@/context/invoice-context";
 
 function calculateDraftTotal(qtn, unitPrice, gst) {
@@ -32,6 +33,7 @@ export function InvoiceDataTable(options) {
     updateLineItem,
     removeLineItem,
   } = useInvoice();
+  const summary = summarizeLineItems(lineItems);
 
   const [invoiceDetails, setInvoiceDetails] = useState({
     desc: "",
@@ -282,10 +284,7 @@ export function InvoiceDataTable(options) {
             Round off :{" "}
           </TableCell>
           <TableCell className="text-center border-r">
-            ₹{" "}
-            {(
-              Math.ceil(totalAmount.toFixed(2)) - totalAmount.toFixed(2)
-            ).toFixed(2)}
+            {formatRoundOff(summary.roundOff)}
           </TableCell>
           <TableCell className=""></TableCell>
         </TableRow>
@@ -294,7 +293,7 @@ export function InvoiceDataTable(options) {
             Amount to Pay :{" "}
           </TableCell>
           <TableCell className="text-center border-r">
-            ₹ {Math.ceil(totalAmount.toFixed(2)).toFixed(2)}
+            ₹ {summary.payable.toFixed(2)}
           </TableCell>
           <TableCell className=""></TableCell>
         </TableRow>
@@ -302,7 +301,7 @@ export function InvoiceDataTable(options) {
           <TableCell colSpan={9} className="text-right italic">
             Amount in words:
             <span className="px-2"></span>
-            {numberToWords(Math.ceil(totalAmount.toFixed(2)))
+            {numberToWords(summary.payable)
               .toLowerCase()
               .replace(/(^\s*\w|[.!?]\s*\w)/g, (c) => c.toUpperCase())}{" "}
             rupees
