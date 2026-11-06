@@ -49,6 +49,7 @@ export function getDefaultInvoiceState() {
     customer: { ...DEFAULT_CUSTOMER },
     invoiceMeta: createDefaultInvoiceMeta(),
     lineItems: [],
+    template: "standard",
     invoiceId: null,
     status: "draft",
     showPreview: false,

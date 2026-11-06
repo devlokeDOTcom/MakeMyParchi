@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { AppNav } from "@/components/app-nav";
 import { useInvoice } from "@/context/invoice-context";
 import { INVOICE_STATUSES } from "@/lib/invoice-status";
+import { INVOICE_TEMPLATES } from "@/lib/invoice-templates";
 import { repository } from "@/lib/repositories";
 import { generateInvoicePdf } from "@/lib/generate-invoice-pdf";
 import { validateInvoiceForExport } from "@/lib/invoice-calc";
@@ -102,7 +103,7 @@ function DashboardTabs() {
     }
     window.print();
   };
-  const { showPreview, setShowPreview } = useInvoice();
+  const { showPreview, setShowPreview, template, setTemplate } = useInvoice();
 
   return (
     <Tabs defaultValue="invoice" className="w-full">
@@ -141,6 +142,23 @@ function DashboardTabs() {
                 <PrinterIcon /> Print Invoice
               </Button> */}
             </ButtonGroup>
+            <div
+              role="group"
+              aria-label="Invoice template"
+              className="flex border border-black/20"
+            >
+              {INVOICE_TEMPLATES.map(({ value, label }) => (
+                <Button
+                  key={value}
+                  size="sm"
+                  variant={template === value ? "default" : "secondary"}
+                  aria-pressed={template === value}
+                  onClick={() => setTemplate(value)}
+                >
+                  {label}
+                </Button>
+              ))}
+            </div>
             <div className={"gap-2 flex items-center"}>
               <Switch checked={showPreview} onCheckedChange={setShowPreview} />
               <Label className={"text-black/50"}>Preview</Label>

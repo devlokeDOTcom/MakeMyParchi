@@ -30,7 +30,7 @@ export function loadInvoiceState() {
 export function saveInvoiceState(state) {
   if (typeof window === "undefined") return;
 
-  const { business, bank, customer, invoiceMeta, lineItems, invoiceId, status } =
+  const { business, bank, customer, invoiceMeta, lineItems, invoiceId, status, template } =
     state;
   localStorage.setItem(
     STORAGE_KEY,
@@ -42,6 +42,7 @@ export function saveInvoiceState(state) {
       lineItems,
       invoiceId,
       status,
+      template,
     }),
   );
 }

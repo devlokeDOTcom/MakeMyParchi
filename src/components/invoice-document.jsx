@@ -2,12 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  calculateLineAmounts,
+  calculateItemAmounts,
   formatCurrency,
   formatDate,
   formatRoundOff,
   summarizeLineItems,
+  toNumber,
 } from "@/lib/invoice-calc";
+import { isBookTemplate } from "@/lib/invoice-templates";
 import { cn, numberToWords } from "@/lib/utils";
 
 export const INVOICE_DOCUMENT_ROOT_ID = "invoice-document-root";
@@ -70,6 +72,11 @@ function InvoiceHeader({ business, invoiceMeta }) {
           <br />
           {formatDate(invoiceMeta.invoiceDate)}
         </p>
+        <p className="mt-2">
+          <span className="text-black/50">Due Date</span>
+          <br />
+          {formatDate(invoiceMeta.dueDate)}
+        </p>
       </section>
     </header>
   );
@@ -103,7 +110,7 @@ function InvoiceCustomer({ customer, invoiceMeta }) {
           </p>
         ) : null}
         <p className="mt-2">
-          <span className="text-black/50">Date</span>
+          <span className="text-black/50">Order Date</span>
           <br />
           {formatDate(invoiceMeta.orderDate)}
         </p>
@@ -112,11 +119,12 @@ function InvoiceCustomer({ customer, invoiceMeta }) {
   );
 }
 
-function InvoiceFooter({ bank, pageNumber, pageCount, showBank }) {
+function InvoiceFooter({ bank, pageNumber, pageCount, isLast }) {
   return (
-    <footer className="mt-4 border-t border-black/10 pt-4">
+    <footer className="mt-4">
+      {isLast ? (
       <div className="w-full flex gap-10">
-        {showBank && (bank.bankName || bank.accountNo || bank.ifsc) ? (
+        {(bank.bankName || bank.accountNo || bank.ifsc) ? (
           <section className="w-1/2">
             <p className="text-xs uppercase tracking-wider text-black/50 mb-2">
               Bank Details
@@ -141,6 +149,7 @@ function InvoiceFooter({ bank, pageNumber, pageCount, showBank }) {
           </div>
         </div>
       </div>
+      ) : null}
       <div className="w-full mt-4">
         <p className="text-slate-500 text-sm w-full mb-2 italic">
           {"This is Challan cum Tax invoice. No separate Challan is required"}
@@ -160,7 +169,88 @@ function InvoiceFooter({ bank, pageNumber, pageCount, showBank }) {
   );
 }
 
-function InvoiceItemsTable({ rows, startIndex, summary, showTotals, isEmpty }) {
+const STANDARD_COLUMNS = [
+  { label: "SL No.", width: 40, align: "text-left" },
+  { label: "Description", align: "text-left" },
+  { label: "Qty", width: 48, align: "text-center" },
+  { label: "Unit Price", width: 84, align: "text-right" },
+  { label: "Taxable Amount", width: 96, align: "text-center" },
+  { label: "GST (%)", width: 56, align: "text-center text-nowrap" },
+  { label: "GST Value", width: 84, align: "text-center text-nowrap" },
+  { label: "Amount", width: 96, align: "text-right" },
+];
+
+const BOOK_COLUMNS = [
+  { label: "SL No.", width: 34, align: "text-left" },
+  { label: "Description", align: "text-left" },
+  { label: "Author Name", width: 84, align: "text-left" },
+  { label: "Publishers", width: 84, align: "text-left" },
+  { label: "Quantity", width: 50, align: "text-center" },
+  { label: "Unit Price", width: 68, align: "text-right" },
+  { label: "Amount", width: 84, align: "text-right" },
+  { label: "Discount", width: 72, align: "text-right" },
+  { label: "Total Amount", width: 98, align: "text-right" },
+];
+
+function StandardRow({ item, number }) {
+  const line = calculateItemAmounts(item, "standard");
+  return (
+    <>
+      <td className="p-2 text-center">{number}</td>
+      <td className="p-2 break-words">{item.desc}</td>
+      <td className="p-2 text-center">{item.qtn}</td>
+      <td className="p-2 text-right">₹ {formatCurrency(item.unitPrice)}</td>
+      <td className="p-2 text-center">
+        {item.qtn && item.unitPrice ? `₹ ${line.taxable.toFixed(2)}` : "—"}
+      </td>
+      <td className="p-2 text-center">{item.gst ? `${item.gst}%` : "—"}</td>
+      <td className="p-2 text-center">
+        {item.gst ? `₹ ${line.gstValue.toFixed(2)}` : "—"}
+      </td>
+      <td className="p-2 text-right">₹ {line.total.toFixed(2)}</td>
+    </>
+  );
+}
+
+function BookRow({ item, number }) {
+  const line = calculateItemAmounts(item, "book");
+  return (
+    <>
+      <td className="p-2 text-center">{number}</td>
+      <td className="p-2 break-words">{item.desc}</td>
+      <td className="p-2 break-words">{item.author || "—"}</td>
+      <td className="p-2 break-words">{item.publisher || "—"}</td>
+      <td className="p-2 text-center">{item.qtn}</td>
+      <td className="p-2 text-right">₹ {formatCurrency(item.unitPrice)}</td>
+      <td className="p-2 text-right">₹ {line.amount.toFixed(2)}</td>
+      <td className="p-2 text-right">
+        {toNumber(item.discount) ? (
+          <>
+            ₹ {line.discountValue.toFixed(2)}
+            <br />
+            <span className="text-black/40">({toNumber(item.discount)}%)</span>
+          </>
+        ) : (
+          "—"
+        )}
+      </td>
+      <td className="p-2 text-right">₹ {line.total.toFixed(2)}</td>
+    </>
+  );
+}
+
+function InvoiceItemsTable({
+  rows,
+  startIndex,
+  summary,
+  template,
+  showTotals,
+  isEmpty,
+}) {
+  const isBook = isBookTemplate(template);
+  const columns = isBook ? BOOK_COLUMNS : STANDARD_COLUMNS;
+  const Row = isBook ? BookRow : StandardRow;
+  const columnCount = columns.length;
   const amountWords = numberToWords(summary.payable)
     .toLowerCase()
     .replace(/(^\s*\w|[.!?]\s*\w)/g, (c) => c.toUpperCase());
@@ -168,65 +258,36 @@ function InvoiceItemsTable({ rows, startIndex, summary, showTotals, isEmpty }) {
   return (
     <table className="w-full table-fixed border-collapse text-xs">
       <colgroup>
-        <col style={{ width: 40 }} />
-        <col />
-        <col style={{ width: 48 }} />
-        <col style={{ width: 84 }} />
-        <col style={{ width: 96 }} />
-        <col style={{ width: 56 }} />
-        <col style={{ width: 84 }} />
-        <col style={{ width: 96 }} />
+        {columns.map(({ label, width }) => (
+          <col key={label} style={width ? { width } : undefined} />
+        ))}
       </colgroup>
       <thead>
         <tr className="bg-black/[3%] border-y border-black/10">
-          <th className="p-2 text-left">SL No.</th>
-          <th className="p-2 text-left">Description</th>
-          <th className="p-2 text-center">Qty</th>
-          <th className="p-2 text-right">Unit Price</th>
-          <th className="p-2 text-center">Taxable Amount</th>
-          <th className="p-2 text-center text-nowrap">GST (%)</th>
-          <th className="p-2 text-center text-nowrap">GST Value</th>
-          <th className="p-2 text-right">Amount</th>
+          {columns.map(({ label, align }) => (
+            <th key={label} className={cn("p-2", align)}>
+              {label}
+            </th>
+          ))}
         </tr>
       </thead>
       <tbody>
         {rows.length > 0 ? (
-          rows.map((item, index) => {
-            const line = calculateLineAmounts(
-              item.qtn,
-              item.unitPrice,
-              item.gst,
-            );
-            return (
-              <tr
-                key={item.id}
-                data-invoice-row
-                className="border-b border-black/5"
-              >
-                <td className="p-2 text-center">{startIndex + index + 1}</td>
-                <td className="p-2 break-words">{item.desc}</td>
-                <td className="p-2 text-center">{item.qtn}</td>
-                <td className="p-2 text-right">
-                  ₹ {formatCurrency(item.unitPrice)}
-                </td>
-                <td className="p-2 text-center">
-                  {item.qtn && item.unitPrice
-                    ? `₹ ${line.taxable.toFixed(2)}`
-                    : "—"}
-                </td>
-                <td className="p-2 text-center">
-                  {item.gst ? `${item.gst}%` : "—"}
-                </td>
-                <td className="p-2 text-center">
-                  {item.gst ? `₹ ${line.gstValue.toFixed(2)}` : "—"}
-                </td>
-                <td className="p-2 text-right">₹ {line.total.toFixed(2)}</td>
-              </tr>
-            );
-          })
+          rows.map((item, index) => (
+            <tr
+              key={item.id}
+              data-invoice-row
+              className="border-b border-black/5"
+            >
+              <Row item={item} number={startIndex + index + 1} />
+            </tr>
+          ))
         ) : isEmpty ? (
           <tr>
-            <td colSpan={8} className="p-4 text-center text-black/40">
+            <td
+              colSpan={columnCount}
+              className="p-4 text-center text-black/40"
+            >
               No line items yet
             </td>
           </tr>
@@ -235,28 +296,49 @@ function InvoiceItemsTable({ rows, startIndex, summary, showTotals, isEmpty }) {
       {showTotals ? (
         <tfoot>
           <tr className="border-t border-black/10 font-semibold">
-            <td colSpan={4} className="p-3 text-right border-r">
+            <td colSpan={isBook ? 6 : 4} className="p-3 text-right border-r">
               Total :
             </td>
-            <td className="p-3 text-center border-r">
-              ₹ {summary.taxable.toFixed(2)}
+            {isBook ? (
+              <>
+                <td className="p-3 text-right border-r whitespace-nowrap">
+                  ₹ {summary.amount.toFixed(2)}
+                </td>
+                <td className="p-3 text-right border-r whitespace-nowrap">
+                  ₹ {summary.discount.toFixed(2)}
+                </td>
+              </>
+            ) : (
+              <>
+                <td className="p-3 text-center border-r whitespace-nowrap">
+                  ₹ {summary.taxable.toFixed(2)}
+                </td>
+                <td className="p-3 text-right"></td>
+                <td className="p-3 text-center border-x whitespace-nowrap">
+                  ₹ {summary.gstValue.toFixed(2)}
+                </td>
+              </>
+            )}
+            <td className="p-3 text-right whitespace-nowrap">
+              ₹ {summary.total.toFixed(2)}
             </td>
-            <td className="p-3 text-right"></td>
-            <td className="p-3 text-center border-x">
-              ₹ {summary.gstValue.toFixed(2)}
-            </td>
-            <td className="p-3 text-right">₹ {summary.total.toFixed(2)}</td>
           </tr>
           <tr className="border-y">
-            <td colSpan={7} className="p-3 text-right italic border-r">
+            <td
+              colSpan={columnCount - 1}
+              className="p-3 text-right italic border-r"
+            >
               Round off :
             </td>
-            <td className="p-3 text-right italic">
+            <td className="p-3 text-right italic whitespace-nowrap">
               {formatRoundOff(summary.roundOff)}
             </td>
           </tr>
           <tr className="border-y">
-            <td colSpan={5} className="p-3 text-slate-500 border-r">
+            <td
+              colSpan={isBook ? 6 : 5}
+              className="p-3 text-slate-500 border-r"
+            >
               Amount in words :{" "}
               <span className="text-right text-slate-900 pl-5">
                 {amountWords} rupees only
@@ -265,7 +347,7 @@ function InvoiceItemsTable({ rows, startIndex, summary, showTotals, isEmpty }) {
             <td colSpan={2} className="p-3 text-right font-bold border-r">
               Amount to pay :
             </td>
-            <td className="p-3 text-right font-bold text-[14px]">
+            <td className="p-3 text-right font-bold text-[13px] whitespace-nowrap">
               ₹ {summary.payable.toFixed(2)}
             </td>
           </tr>
@@ -336,9 +418,13 @@ export function InvoiceDocument({
   customer,
   invoiceMeta,
   lineItems,
+  template = "standard",
   className = "",
 }) {
-  const summary = useMemo(() => summarizeLineItems(lineItems), [lineItems]);
+  const summary = useMemo(
+    () => summarizeLineItems(lineItems, template),
+    [lineItems, template],
+  );
   const sandboxRef = useRef(null);
   const [pageBreaks, setPageBreaks] = useState(null);
 
@@ -379,7 +465,7 @@ export function InvoiceDocument({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [business, bank, customer, invoiceMeta, lineItems]);
+  }, [business, bank, customer, invoiceMeta, lineItems, template]);
 
   const pages = (
     pageBreaks ?? [lineItems.map((_, index) => index)]
@@ -405,24 +491,25 @@ export function InvoiceDocument({
         style={{ width: PAGE_WIDTH, padding: PAGE_PADDING }}
       >
         <div data-measure="page" className="absolute" style={{ height: PAGE_HEIGHT }} />
-        <div data-measure="header">
+        <div data-measure="header" className="flow-root">
           <InvoiceHeader business={business} invoiceMeta={invoiceMeta} />
         </div>
-        <div data-measure="customer">
+        <div data-measure="customer" className="flow-root">
           <InvoiceCustomer customer={customer} invoiceMeta={invoiceMeta} />
         </div>
         <InvoiceItemsTable
           rows={lineItems}
           startIndex={0}
           summary={summary}
+          template={template}
           showTotals
           isEmpty={lineItems.length === 0}
         />
-        <div data-measure="footer">
+        <div data-measure="footer" className="flow-root">
           <InvoiceFooter bank={bank} pageNumber={1} pageCount={2} />
         </div>
-        <div data-measure="footer-last">
-          <InvoiceFooter bank={bank} pageNumber={2} pageCount={2} showBank />
+        <div data-measure="footer-last" className="flow-root">
+          <InvoiceFooter bank={bank} pageNumber={2} pageCount={2} isLast />
         </div>
       </div>
 
@@ -457,6 +544,7 @@ export function InvoiceDocument({
                   rows={rows}
                   startIndex={pageStarts[pageIndex]}
                   summary={summary}
+                  template={template}
                   showTotals={isLast}
                   isEmpty={lineItems.length === 0}
                 />
@@ -465,7 +553,7 @@ export function InvoiceDocument({
                 bank={bank}
                 pageNumber={pageIndex + 1}
                 pageCount={pages.length}
-                showBank={isLast}
+                isLast={isLast}
               />
             </div>
           </div>

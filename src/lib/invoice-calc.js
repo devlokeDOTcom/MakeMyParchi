@@ -7,19 +7,36 @@ export function toNumber(value) {
   return Number(value) || 0;
 }
 
-export function calculateLineAmounts(qtn, unitPrice, gst) {
-  const taxable = toNumber(qtn) * toNumber(unitPrice);
+/**
+ * `amount` is qty x price, `discountValue` is `discount` percent of it, and
+ * GST is charged on what is left (`taxable`).
+ */
+export function calculateLineAmounts(qtn, unitPrice, gst, discount = 0) {
+  const amount = toNumber(qtn) * toNumber(unitPrice);
+  const discountValue = (amount * toNumber(discount)) / 100;
+  const taxable = amount - discountValue;
   const gstValue = (taxable * toNumber(gst)) / 100;
-  return { taxable, gstValue, total: taxable + gstValue };
+  return { amount, discountValue, taxable, gstValue, total: taxable + gstValue };
 }
 
-export function summarizeLineItems(lineItems = []) {
+/** Standard invoices charge GST and ignore discount; book invoices the reverse. */
+export function calculateItemAmounts(item, template) {
+  return template === "book"
+    ? calculateLineAmounts(item.qtn, item.unitPrice, 0, item.discount)
+    : calculateLineAmounts(item.qtn, item.unitPrice, item.gst, 0);
+}
+
+export function summarizeLineItems(lineItems = [], template = "standard") {
+  let amount = 0;
+  let discount = 0;
   let taxable = 0;
   let gstValue = 0;
   let total = 0;
 
   for (const item of lineItems) {
-    const line = calculateLineAmounts(item.qtn, item.unitPrice, item.gst);
+    const line = calculateItemAmounts(item, template);
+    amount += line.amount;
+    discount += line.discountValue;
     taxable += line.taxable;
     gstValue += line.gstValue;
     total += line.total;
@@ -31,6 +48,8 @@ export function summarizeLineItems(lineItems = []) {
   const payable = Math.round(rounded);
 
   return {
+    amount,
+    discount,
     taxable,
     gstValue,
     total: rounded,

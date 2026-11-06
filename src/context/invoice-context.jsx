@@ -10,7 +10,6 @@ import {
   useState,
 } from "react";
 import {
-  calculateLineAmounts,
   summarizeLineItems,
   validateInvoiceForExport,
 } from "@/lib/invoice-calc";
@@ -22,20 +21,6 @@ import { loadInvoiceState, saveInvoiceState } from "@/lib/invoice-storage";
 import { repository } from "@/lib/repositories";
 
 const InvoiceContext = createContext(null);
-
-function withLineTotals(item) {
-  const { taxable, gstValue, total } = calculateLineAmounts(
-    item.qtn,
-    item.unitPrice,
-    item.gst,
-  );
-  return {
-    ...item,
-    totalAmount: total,
-    totalTaxableAmount: taxable,
-    totalGSTValue: gstValue,
-  };
-}
 
 async function peekInvoiceNumber() {
   try {
@@ -55,6 +40,7 @@ export function InvoiceProvider({ children }) {
   const [lineItems, setLineItems] = useState(initial.lineItems);
   const [invoiceId, setInvoiceId] = useState(initial.invoiceId);
   const [status, setStatus] = useState(initial.status);
+  const [template, setTemplate] = useState(initial.template);
   const [showPreview, setShowPreview] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
   const [saveMessageTone, setSaveMessageTone] = useState("success");
@@ -76,6 +62,7 @@ export function InvoiceProvider({ children }) {
       setLineItems(stored.lineItems);
       setInvoiceId(stored.invoiceId);
       setStatus(stored.status);
+      setTemplate(stored.template);
       setHydrated(true);
     })();
 
@@ -96,6 +83,7 @@ export function InvoiceProvider({ children }) {
       lineItems,
       invoiceId,
       status,
+      template,
     });
   }, [
     hydrated,
@@ -106,9 +94,13 @@ export function InvoiceProvider({ children }) {
     lineItems,
     invoiceId,
     status,
+    template,
   ]);
 
-  const summary = useMemo(() => summarizeLineItems(lineItems), [lineItems]);
+  const summary = useMemo(
+    () => summarizeLineItems(lineItems, template),
+    [lineItems, template],
+  );
   const totalAmount = summary.total;
   const totalGSTValue = summary.gstValue;
   const totalTaxableAmount = summary.taxable;
@@ -150,21 +142,22 @@ export function InvoiceProvider({ children }) {
   const addLineItem = useCallback((item) => {
     setLineItems((prev) => [
       ...prev,
-      withLineTotals({
+      {
         id: crypto.randomUUID(),
         desc: item.desc,
+        author: item.author || "",
+        publisher: item.publisher || "",
         qtn: Number(item.qtn),
         unitPrice: Number(item.unitPrice),
         gst: Number(item.gst || 0),
-      }),
+        discount: Number(item.discount || 0),
+      },
     ]);
   }, []);
 
   const updateLineItem = useCallback((id, key, value) => {
     setLineItems((prev) =>
-      prev.map((item) =>
-        item.id === id ? withLineTotals({ ...item, [key]: value }) : item,
-      ),
+      prev.map((item) => (item.id === id ? { ...item, [key]: value } : item)),
     );
   }, []);
 
@@ -193,6 +186,7 @@ export function InvoiceProvider({ children }) {
     setLineItems(saved.lineItems);
     setInvoiceId(saved.id);
     setStatus(saved.status);
+    setTemplate(saved.template || "standard");
     setShowPreview(false);
     return true;
   }, []);
@@ -209,6 +203,7 @@ export function InvoiceProvider({ children }) {
       const saved = await repository.saveInvoice({
         id: invoiceId,
         status,
+        template,
         business,
         bank,
         customer,
@@ -233,6 +228,7 @@ export function InvoiceProvider({ children }) {
     lineItems,
     invoiceId,
     status,
+    template,
     summary,
     flashMessage,
   ]);
@@ -246,6 +242,7 @@ export function InvoiceProvider({ children }) {
       lineItems,
       invoiceId,
       status,
+      template,
     });
     flashMessage("Saved");
   }, [
@@ -256,6 +253,7 @@ export function InvoiceProvider({ children }) {
     lineItems,
     invoiceId,
     status,
+    template,
     flashMessage,
   ]);
 
@@ -292,7 +290,9 @@ export function InvoiceProvider({ children }) {
       lineItems,
       invoiceId,
       status,
+      template,
       setStatus,
+      setTemplate,
       showPreview,
       setShowPreview,
       totalAmount,
@@ -323,6 +323,7 @@ export function InvoiceProvider({ children }) {
       lineItems,
       invoiceId,
       status,
+      template,
       showPreview,
       totalAmount,
       totalTaxableAmount,
