@@ -28,16 +28,13 @@ export const DEFAULT_CUSTOMER = {
   email: "",
 };
 
-export function createDefaultInvoiceMeta() {
+export function createDefaultInvoiceMeta(invoiceNumber = "") {
   const today = new Date();
   const due = new Date(today);
   due.setDate(due.getDate() + 15);
 
-  const pad = (n) => String(n).padStart(2, "0");
-  const dateStr = `${today.getFullYear()}${pad(today.getMonth() + 1)}${pad(today.getDate())}`;
-
   return {
-    invoiceNumber: `INV-${dateStr}-001`,
+    invoiceNumber,
     invoiceDate: today.toISOString().slice(0, 10),
     dueDate: due.toISOString().slice(0, 10),
     orderDate: due.toISOString().slice(0, 10),
@@ -52,6 +49,8 @@ export function getDefaultInvoiceState() {
     customer: { ...DEFAULT_CUSTOMER },
     invoiceMeta: createDefaultInvoiceMeta(),
     lineItems: [],
+    invoiceId: null,
+    status: "draft",
     showPreview: false,
   };
 }

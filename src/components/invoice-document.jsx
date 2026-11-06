@@ -1,258 +1,122 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  calculateLineAmounts,
+  formatCurrency,
+  formatDate,
+  summarizeLineItems,
+} from "@/lib/invoice-calc";
 import { cn, numberToWords } from "@/lib/utils";
 
 export const INVOICE_DOCUMENT_ROOT_ID = "invoice-document-root";
+export const INVOICE_PAGE_SELECTOR = "[data-invoice-page]";
 
-function formatCurrency(amount) {
-  return Number(amount || 0).toLocaleString("en-IN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
+const PAGE_WIDTH = "210mm";
+const PAGE_HEIGHT = "297mm";
+const PAGE_PADDING = 32;
+// Safety margin so rounding differences never push a row past the footer.
+const BODY_BUFFER = 8;
 
-function formatDate(dateStr) {
-  if (!dateStr) return "—";
-  const date = new Date(dateStr);
-  if (Number.isNaN(date.getTime())) return dateStr;
-  return date.toLocaleDateString("en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
-
-export function InvoiceDocument({
-  business,
-  bank,
-  customer,
-  invoiceMeta,
-  lineItems,
-  totalAmount,
-  className = "",
-}) {
-  const amountWords = numberToWords(Math.round(totalAmount))
-    .toLowerCase()
-    .replace(/(^\s*\w|[.!?]\s*\w)/g, (c) => c.toUpperCase());
-
-  let netWithOutTax = 0;
-  let grossWithTax = 0;
-  let totalTax = 0;
-  const getTotal = (type) => {
-    let value = 0;
-    if (!(lineItems.length > 0)) {
-      return 0;
-    }
-    if (type === "TA") {
-      lineItems?.forEach((element) => {
-        value += element.qtn * element.unitPrice;
-      });
-    }
-
-    if (type === "GST") {
-      lineItems?.forEach((element) => {
-        value += (element.qtn * element.unitPrice * element.gst) / 100;
-      });
-    }
-    if (type === "NET") {
-      lineItems?.forEach((element) => {
-        value +=
-          (element.qtn * element.unitPrice * element.gst) / 100 +
-          element.qtn * element.unitPrice;
-      });
-    }
-
-    return value;
-  };
+function InvoiceHeader({ business, invoiceMeta }) {
   return (
-    <div
-      id={INVOICE_DOCUMENT_ROOT_ID}
-      data-invoice-document
-      className={cn(
-        "w-full bg-white text-sm text-black [color-scheme:light]",
-        className,
-      )}
-    >
-      <header className="flex justify-between gap-6 border-b border-black/10 pb-6 mb-6">
-        <section className="w-1/2 flex flex-col justify-between">
-          <div className="flex flex-col w-full">
-            <h2 className="text-4xl font-bold">
-              {business.name || "Your Business"}
-            </h2>
-            {business.description ? (
-              <p className="text-black/40 text-xs">{business.description}</p>
-            ) : null}
-            {business.address ? (
-              <p className="text-black/70 whitespace-pre-wrap">
-                {business.address}
-              </p>
-            ) : null}
-          </div>
-          <div className="mt-3 space-y-1 text-black/60">
-            {business.gstin ? (
-              <p>
-                <span className="font-bold">GSTIN: </span>
-                {business.gstin}
-              </p>
-            ) : null}
-            {business.phone ? (
-              <p>
-                {" "}
-                <span className="font-bold">Phone: </span> {business.phone}
-              </p>
-            ) : null}
-            {business.email ? (
-              <p>
-                {" "}
-                <span className="font-bold">Email: </span> {business.email}
-              </p>
-            ) : null}
-          </div>
-        </section>
-
-        <section className="text-right shrink-0">
-          <p className="text-lg font-bold tracking-wide">
-            <span>Tax Invoice</span>{" "}
-          </p>
-          <p className="mt-3">
-            <span className="text-black/50">Invoice No.</span>
-            <br />
-            {invoiceMeta.invoiceNumber || "—"}
-          </p>
-          <p className="mt-2">
-            <span className="text-black/50">Date</span>
-            <br />
-            {formatDate(invoiceMeta.invoiceDate)}
-          </p>
-        </section>
-      </header>
-
-      <section className="mb-6 w-full flex justify-between">
-        <div className="w-[400px] pr-4">
-          <p className="text-xs uppercase tracking-wider text-black/50 mb-2">
-            Bill To
-          </p>
-          <p className="font-semibold text-sm">{customer.name || "Customer"}</p>
-          {customer.address ? (
-            <p className="text-black/70 text-xs whitespace-pre-wrap">
-              {customer.address}
+    <header className="flex justify-between gap-6 border-b border-black/10 pb-6 mb-6">
+      <section className="w-1/2 flex flex-col justify-between">
+        <div className="flex flex-col w-full">
+          <h2 className="text-4xl font-bold">
+            {business.name || "Your Business"}
+          </h2>
+          {business.description ? (
+            <p className="text-black/40 text-xs">{business.description}</p>
+          ) : null}
+          {business.address ? (
+            <p className="text-black/70 whitespace-pre-wrap">
+              {business.address}
             </p>
           ) : null}
-          <div className="my-4 space-y-1 text-black/60 text-xs">
-            {customer.gstin ? <p>GSTIN: {customer.gstin}</p> : null}
-            {customer.phone ? <p>Phone: {customer.phone}</p> : null}
-            {customer.email ? <p>Email: {customer.email}</p> : null}
-          </div>
         </div>
-        <div className="flex flex-col w-fit h-full text-xs">
-          {invoiceMeta.memoNo ? (
-            <p className="mt-2">
-              <span className="text-black/50">Order Memo no.</span>
-              <br />
-              {invoiceMeta.memoNo}
+        <div className="mt-3 space-y-1 text-black/60">
+          {business.gstin ? (
+            <p>
+              <span className="font-bold">GSTIN: </span>
+              {business.gstin}
             </p>
           ) : null}
-          <p className="mt-2">
-            <span className="text-black/50">Date</span>
-            <br />
-            {formatDate(invoiceMeta.orderDate)}
-          </p>
+          {business.phone ? (
+            <p>
+              <span className="font-bold">Phone: </span> {business.phone}
+            </p>
+          ) : null}
+          {business.email ? (
+            <p>
+              <span className="font-bold">Email: </span> {business.email}
+            </p>
+          ) : null}
         </div>
       </section>
 
-      <table className="w-full border-collapse text-xs">
-        <thead>
-          <tr className="bg-black/[3%] border-y border-black/10">
-            <th className="p-2 text-left w-12 px-4">SL No.</th>
-            <th className="p-2 flex-1 text-left px-4">Description</th>
-            <th className="p-2 text-center w-16 px-4">Qty</th>
-            <th className="p-2 text-right w-24 px-4">Unit Price</th>
-            <th className="p-2 text-center w-32 px-4">Taxable Amount</th>
-            <th className="p-2 text-center w-16 text-nowrap px-4">GST (%)</th>
-            <th className="p-2 text-center w-16 text-nowrap px-4">GST Value</th>
-            <th className="p-2 text-right w-28 px-4">Amount</th>
-          </tr>
-        </thead>
-        <tbody>
-          {lineItems.length > 0 ? (
-            lineItems.map((item, index) => (
-              <tr key={item.id} className="border-b border-black/5">
-                <td className="p-2 text-center">{index + 1}</td>
-                <td className="p-2">{item.desc}</td>
-                <td className="p-2 text-center">{item.qtn}</td>
-                <td className="p-2 text-right">
-                  ₹ {formatCurrency(Math.round(item.unitPrice))}
-                </td>
-                <td className="p-2 text-center">
-                  {item.qtn && item.unitPrice
-                    ? `₹ ${(item.qtn * item.unitPrice).toFixed(2)}`
-                    : "—"}
-                </td>
-                <td className="p-2 text-center">
-                  {item.gst ? `${item.gst}%` : "—"}
-                </td>
-                <td className="p-2 text-center">
-                  {item.gst
-                    ? `₹ ${((item.gst * item.qtn * item.unitPrice) / 100).toFixed(2)}`
-                    : "—"}
-                </td>
-                <td className="p-2 text-right">
-                  ₹ {item?.totalAmount.toFixed(2)}
-                </td>
-              </tr>
-            ))
-          ) : (
-            <tr>
-              <td colSpan={7} className="p-4 text-center text-black/40">
-                No line items yet
-              </td>
-            </tr>
-          )}
-        </tbody>
-        <tfoot>
-          <tr className="border-t border-black/10 font-semibold">
-            <td colSpan={4} className="p-3 text-right border-r">
-              Total :
-            </td>
-            <td className="p-3 text-center border-r">
-              ₹ {getTotal("TA")?.toFixed(2)}
-            </td>
-            <td className="p-3 text-right"></td>
-            <td className="p-3 text-right border-x">
-              ₹ {getTotal("GST")?.toFixed(2)}
-            </td>
-            <td className="p-3 text-right">₹ {getTotal("NET")?.toFixed(2)}</td>
-          </tr>
+      <section className="text-right shrink-0">
+        <p className="text-lg font-bold tracking-wide">
+          <span>Tax Invoice</span>
+        </p>
+        <p className="mt-3">
+          <span className="text-black/50">Invoice No.</span>
+          <br />
+          {invoiceMeta.invoiceNumber || "—"}
+        </p>
+        <p className="mt-2">
+          <span className="text-black/50">Date</span>
+          <br />
+          {formatDate(invoiceMeta.invoiceDate)}
+        </p>
+      </section>
+    </header>
+  );
+}
 
-          <tr className="border-y">
-            <td colSpan={7} className="p-3 text-right italic border-r">
-              Round off :
-            </td>
-            <td colSpan={1} className="p-3 text-right italic">
-              ₹{" "}
-              {(
-                Math.ceil(getTotal("NET")) - getTotal("NET").toFixed(2)
-              ).toFixed(2)}
-            </td>
-          </tr>
-          <tr className="border-y">
-            <td colSpan={5} className="p-3 text-slate-500 border-r">
-              Amount in words :{" "}
-              <span className="text-right text-slate-900 pl-5">
-                {amountWords} rupees only
-              </span>
-            </td>
-            <td colSpan={2} className="p-3 text-right font-bold border-r">
-              Amount to pay :
-            </td>
-            <td colSpan={1} className="p-3 text-right font-bold text-[14px]">
-              ₹ {Math.ceil(getTotal("NET"))?.toFixed(2)}
-            </td>
-          </tr>
-        </tfoot>
-      </table>
+function InvoiceCustomer({ customer, invoiceMeta }) {
+  return (
+    <section className="mb-6 w-full flex justify-between">
+      <div className="w-[400px] pr-4">
+        <p className="text-xs uppercase tracking-wider text-black/50 mb-2">
+          Bill To
+        </p>
+        <p className="font-semibold text-sm">{customer.name || "Customer"}</p>
+        {customer.address ? (
+          <p className="text-black/70 text-xs whitespace-pre-wrap">
+            {customer.address}
+          </p>
+        ) : null}
+        <div className="mt-4 space-y-1 text-black/60 text-xs">
+          {customer.gstin ? <p>GSTIN: {customer.gstin}</p> : null}
+          {customer.phone ? <p>Phone: {customer.phone}</p> : null}
+          {customer.email ? <p>Email: {customer.email}</p> : null}
+        </div>
+      </div>
+      <div className="flex flex-col w-fit h-full text-xs">
+        {invoiceMeta.memoNo ? (
+          <p className="mt-2">
+            <span className="text-black/50">Order Memo no.</span>
+            <br />
+            {invoiceMeta.memoNo}
+          </p>
+        ) : null}
+        <p className="mt-2">
+          <span className="text-black/50">Date</span>
+          <br />
+          {formatDate(invoiceMeta.orderDate)}
+        </p>
+      </div>
+    </section>
+  );
+}
 
+function InvoiceFooter({ bank, pageNumber, pageCount }) {
+  return (
+    <footer className="mt-4 border-t border-black/10 pt-4">
       <div className="w-full flex gap-10">
-        {(bank.bankName || bank.accountNo || bank.ifsc) && (
-          <section className="w-1/2 mt-8 pt-6 border-black/10">
+        {bank.bankName || bank.accountNo || bank.ifsc ? (
+          <section className="w-1/2">
             <p className="text-xs uppercase tracking-wider text-black/50 mb-2">
               Bank Details
             </p>
@@ -267,7 +131,7 @@ export function InvoiceDocument({
               {bank.pan ? <p>PAN: {bank.pan}</p> : null}
             </div>
           </section>
-        )}
+        ) : null}
         <div className="w-1/2 flex flex-col justify-end text-xs">
           <div className="w-full flex justify-end py-4">
             <p className="border-y py-1 w-fit px-10 italic text-xs font-medium text-black/50">
@@ -276,7 +140,7 @@ export function InvoiceDocument({
           </div>
         </div>
       </div>
-      <div className="w-full mt-6">
+      <div className="w-full mt-4">
         <p className="text-slate-500 text-sm w-full mb-2 italic">
           {"This is Challan cum Tax invoice. No separate Challan is required"}
         </p>
@@ -286,6 +150,320 @@ export function InvoiceDocument({
           }
         </p>
       </div>
+      {pageCount > 1 ? (
+        <p className="mt-3 text-right text-[10px] text-black/40">
+          Page {pageNumber} of {pageCount}
+        </p>
+      ) : null}
+    </footer>
+  );
+}
+
+function InvoiceItemsTable({ rows, startIndex, summary, showTotals, isEmpty }) {
+  const amountWords = numberToWords(summary.payable)
+    .toLowerCase()
+    .replace(/(^\s*\w|[.!?]\s*\w)/g, (c) => c.toUpperCase());
+
+  return (
+    <table className="w-full table-fixed border-collapse text-xs">
+      <colgroup>
+        <col style={{ width: 40 }} />
+        <col />
+        <col style={{ width: 48 }} />
+        <col style={{ width: 84 }} />
+        <col style={{ width: 96 }} />
+        <col style={{ width: 56 }} />
+        <col style={{ width: 84 }} />
+        <col style={{ width: 96 }} />
+      </colgroup>
+      <thead>
+        <tr className="bg-black/[3%] border-y border-black/10">
+          <th className="p-2 text-left">SL No.</th>
+          <th className="p-2 text-left">Description</th>
+          <th className="p-2 text-center">Qty</th>
+          <th className="p-2 text-right">Unit Price</th>
+          <th className="p-2 text-center">Taxable Amount</th>
+          <th className="p-2 text-center text-nowrap">GST (%)</th>
+          <th className="p-2 text-center text-nowrap">GST Value</th>
+          <th className="p-2 text-right">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.length > 0 ? (
+          rows.map((item, index) => {
+            const line = calculateLineAmounts(
+              item.qtn,
+              item.unitPrice,
+              item.gst,
+            );
+            return (
+              <tr
+                key={item.id}
+                data-invoice-row
+                className="border-b border-black/5"
+              >
+                <td className="p-2 text-center">{startIndex + index + 1}</td>
+                <td className="p-2 break-words">{item.desc}</td>
+                <td className="p-2 text-center">{item.qtn}</td>
+                <td className="p-2 text-right">
+                  ₹ {formatCurrency(item.unitPrice)}
+                </td>
+                <td className="p-2 text-center">
+                  {item.qtn && item.unitPrice
+                    ? `₹ ${line.taxable.toFixed(2)}`
+                    : "—"}
+                </td>
+                <td className="p-2 text-center">
+                  {item.gst ? `${item.gst}%` : "—"}
+                </td>
+                <td className="p-2 text-center">
+                  {item.gst ? `₹ ${line.gstValue.toFixed(2)}` : "—"}
+                </td>
+                <td className="p-2 text-right">₹ {line.total.toFixed(2)}</td>
+              </tr>
+            );
+          })
+        ) : isEmpty ? (
+          <tr>
+            <td colSpan={8} className="p-4 text-center text-black/40">
+              No line items yet
+            </td>
+          </tr>
+        ) : null}
+      </tbody>
+      {showTotals ? (
+        <tfoot>
+          <tr className="border-t border-black/10 font-semibold">
+            <td colSpan={4} className="p-3 text-right border-r">
+              Total :
+            </td>
+            <td className="p-3 text-center border-r">
+              ₹ {summary.taxable.toFixed(2)}
+            </td>
+            <td className="p-3 text-right"></td>
+            <td className="p-3 text-center border-x">
+              ₹ {summary.gstValue.toFixed(2)}
+            </td>
+            <td className="p-3 text-right">₹ {summary.total.toFixed(2)}</td>
+          </tr>
+          <tr className="border-y">
+            <td colSpan={7} className="p-3 text-right italic border-r">
+              Round off :
+            </td>
+            <td className="p-3 text-right italic">
+              ₹ {summary.roundOff.toFixed(2)}
+            </td>
+          </tr>
+          <tr className="border-y">
+            <td colSpan={5} className="p-3 text-slate-500 border-r">
+              Amount in words :{" "}
+              <span className="text-right text-slate-900 pl-5">
+                {amountWords} rupees only
+              </span>
+            </td>
+            <td colSpan={2} className="p-3 text-right font-bold border-r">
+              Amount to pay :
+            </td>
+            <td className="p-3 text-right font-bold text-[14px]">
+              ₹ {summary.payable.toFixed(2)}
+            </td>
+          </tr>
+        </tfoot>
+      ) : null}
+    </table>
+  );
+}
+
+function outerHeight(element) {
+  if (!element) return 0;
+  const style = getComputedStyle(element);
+  return (
+    element.getBoundingClientRect().height +
+    parseFloat(style.marginTop || 0) +
+    parseFloat(style.marginBottom || 0)
+  );
+}
+
+/**
+ * Splits rows into pages given measured heights. The header and footer are
+ * repeated on every page, "Bill To" only sits on page 1 and the totals only on
+ * the last page.
+ * @returns {number[][]} row indices per page
+ */
+function paginate(rowHeights, m) {
+  const bodyHeight = (isFirst) =>
+    m.pageInner -
+    m.header -
+    m.footer -
+    (isFirst ? m.customer : 0) -
+    m.thead -
+    BODY_BUFFER;
+
+  const pages = [];
+  let current = [];
+  let used = 0;
+  let available = bodyHeight(true);
+
+  rowHeights.forEach((height, index) => {
+    if (current.length && used + height > available) {
+      pages.push(current);
+      current = [];
+      used = 0;
+      available = bodyHeight(false);
+    }
+    current.push(index);
+    used += height;
+  });
+  pages.push(current);
+
+  // Totals must fit on the last page; otherwise carry one row over with them.
+  if (used + m.tfoot > available) {
+    if (current.length > 1) {
+      pages.push([current.pop()]);
+    } else {
+      pages.push([]);
+    }
+  }
+
+  return pages;
+}
+
+export function InvoiceDocument({
+  business,
+  bank,
+  customer,
+  invoiceMeta,
+  lineItems,
+  className = "",
+}) {
+  const summary = useMemo(() => summarizeLineItems(lineItems), [lineItems]);
+  const sandboxRef = useRef(null);
+  const [pageBreaks, setPageBreaks] = useState(null);
+
+  // Measure a hidden, unpaginated copy and work out where pages break.
+  useEffect(() => {
+    let cancelled = false;
+    let timer = 0;
+
+    const measure = () => {
+      const sandbox = sandboxRef.current;
+      if (cancelled || !sandbox) return;
+
+      const pick = (name) => sandbox.querySelector(`[data-measure="${name}"]`);
+      const pageHeight = pick("page").getBoundingClientRect().height;
+      const rowHeights = [
+        ...sandbox.querySelectorAll("[data-invoice-row]"),
+      ].map((row) => row.getBoundingClientRect().height);
+
+      setPageBreaks(
+        paginate(rowHeights, {
+          pageInner: pageHeight - PAGE_PADDING * 2,
+          header: outerHeight(pick("header")),
+          footer: outerHeight(pick("footer")),
+          customer: outerHeight(pick("customer")),
+          thead: sandbox.querySelector("thead").getBoundingClientRect().height,
+          tfoot: sandbox.querySelector("tfoot").getBoundingClientRect().height,
+        }),
+      );
+    };
+
+    timer = setTimeout(measure, 0);
+    document.fonts?.ready.then(() => {
+      if (!cancelled) timer = setTimeout(measure, 0);
+    });
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [business, bank, customer, invoiceMeta, lineItems]);
+
+  const pages = (
+    pageBreaks ?? [lineItems.map((_, index) => index)]
+  ).map((indices) => indices.filter((index) => lineItems[index]));
+
+  const pageStarts = pages.map((_, index) =>
+    pages.slice(0, index).reduce((count, page) => count + page.length, 0),
+  );
+
+  return (
+    <div
+      id={INVOICE_DOCUMENT_ROOT_ID}
+      data-invoice-document
+      className={cn(
+        "flex w-full flex-col gap-6 overflow-x-auto text-sm text-black [color-scheme:light] print:gap-0 print:overflow-visible",
+        className,
+      )}
+    >
+      <div
+        ref={sandboxRef}
+        aria-hidden
+        className="pointer-events-none invisible fixed top-0 -left-[10000px] print:hidden"
+        style={{ width: PAGE_WIDTH, padding: PAGE_PADDING }}
+      >
+        <div data-measure="page" className="absolute" style={{ height: PAGE_HEIGHT }} />
+        <div data-measure="header">
+          <InvoiceHeader business={business} invoiceMeta={invoiceMeta} />
+        </div>
+        <div data-measure="customer">
+          <InvoiceCustomer customer={customer} invoiceMeta={invoiceMeta} />
+        </div>
+        <InvoiceItemsTable
+          rows={lineItems}
+          startIndex={0}
+          summary={summary}
+          showTotals
+          isEmpty={lineItems.length === 0}
+        />
+        <div data-measure="footer">
+          <InvoiceFooter bank={bank} pageNumber={1} pageCount={2} />
+        </div>
+      </div>
+
+      {pages.map((indices, pageIndex) => {
+        const rows = indices.map((index) => lineItems[index]);
+        const isFirst = pageIndex === 0;
+        const isLast = pageIndex === pages.length - 1;
+
+        return (
+          <div
+            key={pageIndex}
+            className="invoice-page-frame mx-auto shrink-0 border border-black/10 shadow print:border-0 print:shadow-none"
+          >
+            <div
+              data-invoice-page={pageIndex + 1}
+              className="flex flex-col overflow-hidden bg-white"
+              style={{
+                width: PAGE_WIDTH,
+                height: PAGE_HEIGHT,
+                padding: PAGE_PADDING,
+              }}
+            >
+              <InvoiceHeader business={business} invoiceMeta={invoiceMeta} />
+              {isFirst ? (
+                <InvoiceCustomer
+                  customer={customer}
+                  invoiceMeta={invoiceMeta}
+                />
+              ) : null}
+              <div className="min-h-0 flex-1">
+                <InvoiceItemsTable
+                  rows={rows}
+                  startIndex={pageStarts[pageIndex]}
+                  summary={summary}
+                  showTotals={isLast}
+                  isEmpty={lineItems.length === 0}
+                />
+              </div>
+              <InvoiceFooter
+                bank={bank}
+                pageNumber={pageIndex + 1}
+                pageCount={pages.length}
+              />
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

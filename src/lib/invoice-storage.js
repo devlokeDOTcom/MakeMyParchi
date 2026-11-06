@@ -30,9 +30,18 @@ export function loadInvoiceState() {
 export function saveInvoiceState(state) {
   if (typeof window === "undefined") return;
 
-  const { business, bank, customer, invoiceMeta, lineItems } = state;
+  const { business, bank, customer, invoiceMeta, lineItems, invoiceId, status } =
+    state;
   localStorage.setItem(
     STORAGE_KEY,
-    JSON.stringify({ business, bank, customer, invoiceMeta, lineItems }),
+    JSON.stringify({
+      business,
+      bank,
+      customer,
+      invoiceMeta,
+      lineItems,
+      invoiceId,
+      status,
+    }),
   );
 }

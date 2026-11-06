@@ -1,0 +1,317 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  CopyIcon,
+  ListChecksIcon,
+  PencilSimpleIcon,
+  TrashIcon,
+} from "@phosphor-icons/react";
+import { AppNav } from "@/components/app-nav";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { useInvoice } from "@/context/invoice-context";
+import { createDefaultInvoiceMeta } from "@/lib/invoice-defaults";
+import { formatCurrency, formatDate } from "@/lib/invoice-calc";
+import {
+  STATUS_BADGE_CLASS,
+  STATUS_LABEL,
+  getDisplayStatus,
+} from "@/lib/invoice-status";
+import { repository } from "@/lib/repositories";
+import { cn } from "@/lib/utils";
+
+const FILTERS = ["all", "draft", "sent", "overdue", "paid"];
+
+function StatCard({ label, value }) {
+  return (
+    <div className="flex-1 min-w-[180px] border border-black/10 bg-white p-4 shadow">
+      <p className="text-xs text-black/50">{label}</p>
+      <p className="mt-1 text-xl font-semibold">₹ {formatCurrency(value)}</p>
+    </div>
+  );
+}
+
+export default function InvoicesPage() {
+  const router = useRouter();
+  const { openInvoice } = useInvoice();
+  const [invoices, setInvoices] = useState([]);
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState("");
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState("all");
+
+  const refresh = useCallback(async () => {
+    try {
+      setInvoices(await repository.listInvoices());
+      setError("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not load invoices.");
+    }
+    setLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    repository
+      .listInvoices()
+      .then((list) => {
+        if (!cancelled) setInvoices(list);
+      })
+      .catch((e) => {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : "Could not load invoices.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const rows = useMemo(
+    () =>
+      invoices.map((invoice) => ({
+        invoice,
+        displayStatus: getDisplayStatus(invoice),
+      })),
+    [invoices],
+  );
+
+  const stats = useMemo(() => {
+    const sum = (predicate) =>
+      rows
+        .filter(predicate)
+        .reduce((acc, { invoice }) => acc + (invoice.totals?.payable || 0), 0);
+    return {
+      outstanding: sum(
+        ({ displayStatus }) =>
+          displayStatus === "sent" || displayStatus === "overdue",
+      ),
+      overdue: sum(({ displayStatus }) => displayStatus === "overdue"),
+      paid: sum(({ displayStatus }) => displayStatus === "paid"),
+    };
+  }, [rows]);
+
+  const visible = rows.filter(({ invoice, displayStatus }) => {
+    if (filter !== "all" && displayStatus !== filter) return false;
+    const needle = query.trim().toLowerCase();
+    if (!needle) return true;
+    return (
+      invoice.invoiceMeta.invoiceNumber.toLowerCase().includes(needle) ||
+      (invoice.customer?.name || "").toLowerCase().includes(needle)
+    );
+  });
+
+  const run = async (action) => {
+    try {
+      await action();
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Something went wrong.");
+    }
+  };
+
+  const handleOpen = async (id) => {
+    if (await openInvoice(id)) router.push("/");
+    else setError("That invoice could not be found.");
+  };
+
+  const handleDuplicate = ({ invoice }) =>
+    run(async () => {
+      const invoiceNumber = await repository.peekNextInvoiceNumber();
+      const fresh = createDefaultInvoiceMeta(invoiceNumber);
+      await repository.saveInvoice({
+        ...invoice,
+        id: undefined,
+        status: "draft",
+        invoiceMeta: {
+          ...invoice.invoiceMeta,
+          invoiceNumber,
+          invoiceDate: fresh.invoiceDate,
+          dueDate: fresh.dueDate,
+        },
+      });
+    });
+
+  const handleSetStatus = ({ invoice }, status) =>
+    run(() => repository.saveInvoice({ ...invoice, status }));
+
+  const handleDelete = ({ invoice }) => {
+    if (
+      !window.confirm(
+        `Delete invoice ${invoice.invoiceMeta.invoiceNumber}? This cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+    run(() => repository.deleteInvoice(invoice.id));
+  };
+
+  return (
+    <div className="flex flex-col flex-1 font-sans p-4 mx-auto max-w-6xl w-full gap-5">
+      <AppNav />
+      <div className="flex gap-2 text-2xl items-center">
+        <ListChecksIcon size={40} weight="light" />
+        Invoices
+      </div>
+
+      <div className="flex flex-wrap gap-4">
+        <StatCard label="Outstanding" value={stats.outstanding} />
+        <StatCard label="Overdue" value={stats.overdue} />
+        <StatCard label="Paid" value={stats.paid} />
+      </div>
+
+      <div className="w-full bg-white p-4 border border-black/10 shadow flex flex-col gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap gap-2">
+            {FILTERS.map((value) => (
+              <Button
+                key={value}
+                size="sm"
+                variant={filter === value ? "default" : "secondary"}
+                className="border border-black/10"
+                onClick={() => setFilter(value)}
+              >
+                {value === "all" ? "All" : STATUS_LABEL[value]}
+              </Button>
+            ))}
+          </div>
+          <Input
+            className="w-full sm:w-64"
+            placeholder="Search invoice no. or customer"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </div>
+
+        {error ? <p className="text-xs text-red-700">{error}</p> : null}
+
+        <Table>
+          <TableHeader className="bg-black/[3%]">
+            <TableRow>
+              <TableHead>Invoice No.</TableHead>
+              <TableHead>Customer</TableHead>
+              <TableHead>Date</TableHead>
+              <TableHead>Due Date</TableHead>
+              <TableHead className="text-right">Amount</TableHead>
+              <TableHead className="text-center">Status</TableHead>
+              <TableHead className="text-center">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {visible.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={7} className="p-6 text-center text-black/40">
+                  {!loaded
+                    ? "Loading…"
+                    : invoices.length === 0
+                      ? "No saved invoices yet. Create one and press Save Invoice."
+                      : "No invoices match your filters."}
+                </TableCell>
+              </TableRow>
+            ) : (
+              visible.map((row) => {
+                const { invoice, displayStatus } = row;
+                return (
+                  <TableRow key={invoice.id}>
+                    <TableCell className="font-medium">
+                      {invoice.invoiceMeta.invoiceNumber}
+                    </TableCell>
+                    <TableCell>{invoice.customer?.name || "—"}</TableCell>
+                    <TableCell>
+                      {formatDate(invoice.invoiceMeta.invoiceDate)}
+                    </TableCell>
+                    <TableCell>
+                      {formatDate(invoice.invoiceMeta.dueDate)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      ₹ {formatCurrency(invoice.totals?.payable)}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <span
+                        className={cn(
+                          "inline-block px-2 py-0.5 text-xs font-medium",
+                          STATUS_BADGE_CLASS[displayStatus],
+                        )}
+                      >
+                        {STATUS_LABEL[displayStatus]}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center justify-center gap-1">
+                        {invoice.status === "paid" ? (
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => handleSetStatus(row, "sent")}
+                          >
+                            Mark unpaid
+                          </Button>
+                        ) : (
+                          <>
+                            {invoice.status === "draft" ? (
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => handleSetStatus(row, "sent")}
+                              >
+                                Mark sent
+                              </Button>
+                            ) : null}
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => handleSetStatus(row, "paid")}
+                            >
+                              Mark paid
+                            </Button>
+                          </>
+                        )}
+                        <Button
+                          size="icon"
+                          variant="secondary"
+                          title="Open"
+                          onClick={() => handleOpen(invoice.id)}
+                        >
+                          <PencilSimpleIcon size={15} />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="secondary"
+                          title="Duplicate"
+                          onClick={() => handleDuplicate(row)}
+                        >
+                          <CopyIcon size={15} />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="destructive"
+                          title="Delete"
+                          onClick={() => handleDelete(row)}
+                        >
+                          <TrashIcon size={15} />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+}

@@ -7,6 +7,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const nextConfig = {
   outputFileTracingRoot: path.join(__dirname),
   turbopack: {},
+  // Next 16 blocks dev assets/HMR for any origin other than localhost. Without
+  // this, opening the "Network" URL (e.g. from a phone) leaves the page
+  // un-hydrated: it renders, but buttons and tabs do nothing.
+  allowedDevOrigins: ["192.168.1.39"],
 };
 
 // `npm run dev` → lifecycle "dev" (no PWA / webpack plugins).

@@ -10,11 +10,12 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { InvoiceProvider, useInvoice } from "@/context/invoice-context";
-import {
-  generateInvoicePdf,
-  validateInvoiceForExport,
-} from "@/lib/generate-invoice-pdf";
+import { AppNav } from "@/components/app-nav";
+import { useInvoice } from "@/context/invoice-context";
+import { INVOICE_STATUSES } from "@/lib/invoice-status";
+import { repository } from "@/lib/repositories";
+import { generateInvoicePdf } from "@/lib/generate-invoice-pdf";
+import { validateInvoiceForExport } from "@/lib/invoice-calc";
 import {
   NewspaperClippingIcon,
   ArrowDownIcon,
@@ -26,28 +27,24 @@ import {
   AddressBookIcon,
   CalendarBlankIcon,
   BarcodeIcon,
+  FloppyDiskIcon,
 } from "@phosphor-icons/react";
-import Image from "next/image";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
 export default function Home() {
-  return (
-    <InvoiceProvider>
-      <HomeContent />
-    </InvoiceProvider>
-  );
-}
-
-function HomeContent() {
-  const { createNewInvoice } = useInvoice();
+  const { createNewInvoice, invoiceId, invoiceMeta } = useInvoice();
 
   return (
     <>
       <div className="no-print flex flex-col flex-1 font-sans p-4 mx-auto max-w-6xl gap-5">
+        <AppNav />
         <div className="w-full flex justify-between">
           <div className="flex gap-2 text-2xl items-center">
             <NewspaperClippingIcon size={40} weight="light" />
-            New Invoice
+            {invoiceId
+              ? `Edit Invoice ${invoiceMeta.invoiceNumber}`
+              : "New Invoice"}
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -77,7 +74,8 @@ function HomeContent() {
 }
 
 function DashboardTabs() {
-  const { invoiceData, saveMessage } = useInvoice();
+  const { invoiceData, saveMessage, saveMessageTone, saveInvoice } =
+    useInvoice();
 
   const handleDownload = async () => {
     const errors = validateInvoiceForExport(invoiceData);
@@ -122,12 +120,20 @@ function DashboardTabs() {
         </TabsList>
         <div className="flex items-center gap-3">
           {saveMessage ? (
-            <span className="text-xs text-green-700 font-medium">
+            <span
+              className={cn(
+                "text-xs font-medium",
+                saveMessageTone === "error" ? "text-red-700" : "text-green-700",
+              )}
+            >
               {saveMessage}
             </span>
           ) : null}
           <div className="flex flex-col items-end gap-5">
             <ButtonGroup>
+              <Button variant="secondary" onClick={saveInvoice}>
+                <FloppyDiskIcon /> Save Invoice
+              </Button>
               <Button onClick={handleDownload}>
                 <ArrowDownIcon /> Download
               </Button>
@@ -178,11 +184,11 @@ function InvoicePreviewPanel() {
         "mx-auto",
         showPreview
           ? "block max-w-6xl p-4"
-          : "fixed inset-0 opacity-0 pointer-events-none w-[210mm] max-w-[210mm] p-8",
-        "print:static print:!left-auto print:z-auto print:w-full print:max-w-6xl print:p-4",
+          : "fixed inset-0 opacity-0 pointer-events-none w-[210mm] max-w-[210mm]",
+        "print:static print:!left-auto print:z-auto print:w-full print:max-w-none print:p-0 print:opacity-100",
       )}
     >
-      <InvoicePreview className="border border-black/10 shadow p-8 print:shadow-none print:border-0" />
+      <InvoicePreview />
     </div>
   );
 }
@@ -342,6 +348,67 @@ function BusinessDetails() {
   );
 }
 
+function CustomerPicker() {
+  const { customer, applyCustomer } = useInvoice();
+  const [customers, setCustomers] = useState([]);
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    repository
+      .listCustomers()
+      .then((list) => {
+        if (!cancelled) setCustomers(list);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleSaveToBook = async () => {
+    try {
+      const existing = customers.find(
+        (entry) => entry.name.toLowerCase() === customer.name.trim().toLowerCase(),
+      );
+      const saved = await repository.saveCustomer({ ...existing, ...customer });
+      setCustomers(await repository.listCustomers());
+      setMessage(existing ? `Updated ${saved.name}` : `Added ${saved.name}`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not save.");
+    }
+  };
+
+  return (
+    <div className="flex flex-wrap items-end gap-3 w-full border rounded shadow p-5">
+      <Field className="w-full sm:w-1/2">
+        <Label>Pick from customer book</Label>
+        <select
+          className="h-8 w-full border border-input bg-transparent px-2.5 text-xs outline-none"
+          value=""
+          onChange={(e) => {
+            const entry = customers.find((c) => c.id === e.target.value);
+            if (entry) applyCustomer(entry);
+          }}
+        >
+          <option value="">
+            {customers.length ? "Select a saved customer…" : "No saved customers yet"}
+          </option>
+          {customers.map((entry) => (
+            <option key={entry.id} value={entry.id}>
+              {entry.name}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <Button type="button" variant="secondary" className="border border-black/20" onClick={handleSaveToBook}>
+        <PlusIcon /> Save to customer book
+      </Button>
+      {message ? <span className="text-xs text-black/50">{message}</span> : null}
+    </div>
+  );
+}
+
 function AccountDetails() {
   const { customer, updateCustomer, persistNow } = useInvoice();
 
@@ -361,6 +428,8 @@ function AccountDetails() {
           <h1>Customer Details</h1>
         </span>
       </div>
+
+      <CustomerPicker />
 
       <div className="flex flex-col lg:flex-row gap-5 w-full border rounded shadow p-5">
         <div className="flex flex-col gap-5 flex-1">
@@ -415,13 +484,8 @@ function AccountDetails() {
 }
 
 function Invoice() {
-  const {
-    invoiceMeta,
-    updateInvoiceMeta,
-    setShowPreview,
-    showPreview,
-    persistNow,
-  } = useInvoice();
+  const { invoiceMeta, updateInvoiceMeta, status, setStatus, persistNow } =
+    useInvoice();
 
   return (
     <div className="w-full p-4 flex flex-col gap-5 relative">
@@ -450,6 +514,28 @@ function Invoice() {
               value={invoiceMeta.invoiceDate}
               onChange={(e) => updateInvoiceMeta("invoiceDate", e.target.value)}
             />
+          </Field>
+          <Field>
+            <Label>Due Date</Label>
+            <Input
+              type="date"
+              value={invoiceMeta.dueDate}
+              onChange={(e) => updateInvoiceMeta("dueDate", e.target.value)}
+            />
+          </Field>
+          <Field>
+            <Label>Status</Label>
+            <select
+              className="h-8 w-full border border-input bg-transparent px-2.5 text-xs outline-none"
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+            >
+              {INVOICE_STATUSES.map(({ value, label }) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
           </Field>
         </div>
         <div className="flex justify-between items-end gap-2 flex-wrap">

@@ -129,7 +129,20 @@
   } */
 }
 
+@page {
+  size: A4;
+  margin: 0;
+}
+
 @media print {
+  .invoice-page-frame {
+    break-after: page;
+  }
+
+  .invoice-page-frame:last-child {
+    break-after: auto;
+  }
+
   .no-print {
     display: none !important;
   }

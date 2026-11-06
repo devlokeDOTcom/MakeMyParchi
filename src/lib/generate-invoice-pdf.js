@@ -1,38 +1,44 @@
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas-pro";
-import { INVOICE_DOCUMENT_ROOT_ID } from "@/components/invoice-document";
+import {
+  INVOICE_DOCUMENT_ROOT_ID,
+  INVOICE_PAGE_SELECTOR,
+} from "@/components/invoice-document";
+
+export { validateInvoiceForExport } from "./invoice-calc";
 
 /**
- * Exports the DOM node `#invoice-document-root` (from `InvoiceDocument`) to PDF.
- * Same markup as preview & print — customize layout only in `invoice-document.jsx`.
+ * Exports every `[data-invoice-page]` inside the invoice document as one A4 PDF
+ * page. Pagination (and the repeated header/footer) is decided by
+ * `InvoiceDocument`, so preview, print and PDF always match.
  */
-export async function generateInvoicePdfFromElement(element, invoiceMeta) {
-  const canvas = await html2canvas(element, {
-    scale: 2,
-    useCORS: true,
-    logging: false,
-    backgroundColor: "#ffffff",
-  });
+export async function generateInvoicePdfFromElement(root, invoiceMeta) {
+  const pages = root.querySelectorAll(INVOICE_PAGE_SELECTOR);
+  if (!pages.length) {
+    throw new Error("Invoice pages not found in the document.");
+  }
 
-  const imgData = canvas.toDataURL("image/png", 1.0);
   const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
 
-  const imgWidth = pageWidth;
-  const imgHeight = (canvas.height * imgWidth) / canvas.width;
+  for (let index = 0; index < pages.length; index += 1) {
+    const canvas = await html2canvas(pages[index], {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      backgroundColor: "#ffffff",
+    });
 
-  let heightLeft = imgHeight;
-  let position = 0;
-
-  pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-  heightLeft -= pageHeight;
-
-  while (heightLeft > 0) {
-    position = heightLeft - imgHeight;
-    pdf.addPage();
-    pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-    heightLeft -= pageHeight;
+    if (index > 0) pdf.addPage();
+    pdf.addImage(
+      canvas.toDataURL("image/png", 1.0),
+      "PNG",
+      0,
+      0,
+      pageWidth,
+      pageHeight,
+    );
   }
 
   const fileName =
@@ -52,17 +58,4 @@ export async function generateInvoicePdf(invoiceData) {
     throw new Error("Invoice template not found in the page.");
   }
   await generateInvoicePdfFromElement(el, invoiceData.invoiceMeta);
-}
-
-export function validateInvoiceForExport({ lineItems, business }) {
-  const errors = [];
-
-  if (!business?.name?.trim()) {
-    errors.push("Add your business name under the Business tab.");
-  }
-  if (!lineItems?.length) {
-    errors.push("Add at least one line item on the Invoice tab.");
-  }
-
-  return errors;
 }

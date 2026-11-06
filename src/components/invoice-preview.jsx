@@ -8,8 +8,7 @@ import { useInvoice } from "@/context/invoice-context";
  * Layout is only edited in `invoice-document.jsx`.
  */
 export function InvoicePreview({ className }) {
-  const { business, bank, customer, invoiceMeta, lineItems, totalAmount } =
-    useInvoice();
+  const { business, bank, customer, invoiceMeta, lineItems } = useInvoice();
 
   return (
     <InvoiceDocument
@@ -18,7 +17,6 @@ export function InvoicePreview({ className }) {
       customer={customer}
       invoiceMeta={invoiceMeta}
       lineItems={lineItems}
-      totalAmount={totalAmount}
       className={className}
     />
   );

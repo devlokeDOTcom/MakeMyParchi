@@ -6,81 +6,119 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
-import { createDefaultInvoiceMeta } from "@/lib/invoice-defaults";
+import {
+  calculateLineAmounts,
+  summarizeLineItems,
+  validateInvoiceForExport,
+} from "@/lib/invoice-calc";
+import {
+  createDefaultInvoiceMeta,
+  getDefaultInvoiceState,
+} from "@/lib/invoice-defaults";
 import { loadInvoiceState, saveInvoiceState } from "@/lib/invoice-storage";
+import { repository } from "@/lib/repositories";
 
 const InvoiceContext = createContext(null);
 
-function calculateLineTotal(qtn, unitPrice, gst = 0) {
-  const quantity = Number(qtn) || 0;
-  const price = Number(unitPrice) || 0;
-  const tax = Number(gst) || 0;
-  const subtotal = quantity * price;
-  return subtotal + (subtotal * tax) / 100;
+function withLineTotals(item) {
+  const { taxable, gstValue, total } = calculateLineAmounts(
+    item.qtn,
+    item.unitPrice,
+    item.gst,
+  );
+  return {
+    ...item,
+    totalAmount: total,
+    totalTaxableAmount: taxable,
+    totalGSTValue: gstValue,
+  };
 }
-function calculateLineTotalTaxableAmount(qtn, unitPrice) {
-  const quantity = Number(qtn) || 0;
-  const price = Number(unitPrice) || 0;
 
-  return price * quantity;
-}
-function calculateLineTotalGSTvalue(qtn, unitPrice, gst = 0) {
-  const quantity = Number(qtn) || 0;
-  const price = Number(unitPrice) || 0;
-  const tax = Number(gst) || 0;
-  return (quantity * price * tax) / 100;
+async function peekInvoiceNumber() {
+  try {
+    return await repository.peekNextInvoiceNumber();
+  } catch {
+    return "";
+  }
 }
 
 export function InvoiceProvider({ children }) {
+  const [initial] = useState(getDefaultInvoiceState);
   const [hydrated, setHydrated] = useState(false);
-  const [business, setBusiness] = useState(() => loadInvoiceState().business);
-  const [bank, setBank] = useState(() => loadInvoiceState().bank);
-  const [customer, setCustomer] = useState(() => loadInvoiceState().customer);
-  const [invoiceMeta, setInvoiceMeta] = useState(
-    () => loadInvoiceState().invoiceMeta,
-  );
-  const [lineItems, setLineItems] = useState(
-    () => loadInvoiceState().lineItems,
-  );
+  const [business, setBusiness] = useState(initial.business);
+  const [bank, setBank] = useState(initial.bank);
+  const [customer, setCustomer] = useState(initial.customer);
+  const [invoiceMeta, setInvoiceMeta] = useState(initial.invoiceMeta);
+  const [lineItems, setLineItems] = useState(initial.lineItems);
+  const [invoiceId, setInvoiceId] = useState(initial.invoiceId);
+  const [status, setStatus] = useState(initial.status);
   const [showPreview, setShowPreview] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
+  const [saveMessageTone, setSaveMessageTone] = useState("success");
+  const messageTimer = useRef(null);
 
   useEffect(() => {
-    const stored = loadInvoiceState();
-    setBusiness(stored.business);
-    setBank(stored.bank);
-    setCustomer(stored.customer);
-    setInvoiceMeta(stored.invoiceMeta);
-    setLineItems(stored.lineItems);
-    setHydrated(true);
+    let cancelled = false;
+
+    (async () => {
+      const stored = loadInvoiceState();
+      const invoiceNumber =
+        stored.invoiceMeta.invoiceNumber || (await peekInvoiceNumber());
+      if (cancelled) return;
+
+      setBusiness(stored.business);
+      setBank(stored.bank);
+      setCustomer(stored.customer);
+      setInvoiceMeta({ ...stored.invoiceMeta, invoiceNumber });
+      setLineItems(stored.lineItems);
+      setInvoiceId(stored.invoiceId);
+      setStatus(stored.status);
+      setHydrated(true);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  useEffect(() => () => clearTimeout(messageTimer.current), []);
 
   useEffect(() => {
     if (!hydrated) return;
-    saveInvoiceState({ business, bank, customer, invoiceMeta, lineItems });
-  }, [hydrated, business, bank, customer, invoiceMeta, lineItems]);
+    saveInvoiceState({
+      business,
+      bank,
+      customer,
+      invoiceMeta,
+      lineItems,
+      invoiceId,
+      status,
+    });
+  }, [
+    hydrated,
+    business,
+    bank,
+    customer,
+    invoiceMeta,
+    lineItems,
+    invoiceId,
+    status,
+  ]);
 
-  const totalAmount = useMemo(
-    () =>
-      lineItems.reduce((acc, item) => acc + Number(item.totalAmount || 0), 0),
-    [lineItems],
-  );
+  const summary = useMemo(() => summarizeLineItems(lineItems), [lineItems]);
+  const totalAmount = summary.total;
+  const totalGSTValue = summary.gstValue;
+  const totalTaxableAmount = summary.taxable;
 
-  const totalGSTValue = useMemo(
-    () =>
-      lineItems.reduce((acc, item) => acc + Number(item.totalGSTValue || 0), 0),
-    [lineItems],
-  );
-  const totalTaxableAmount = useMemo(
-    () =>
-      lineItems.reduce(
-        (acc, item) => acc + Number(item.totalTaxableAmount || 0),
-        0,
-      ),
-    [lineItems],
-  );
+  const flashMessage = useCallback((text, tone = "success") => {
+    setSaveMessage(text);
+    setSaveMessageTone(tone);
+    clearTimeout(messageTimer.current);
+    messageTimer.current = setTimeout(() => setSaveMessage(""), 2500);
+  }, []);
 
   const updateBusiness = useCallback((key, value) => {
     setBusiness((prev) => ({ ...prev, [key]: value }));
@@ -94,56 +132,39 @@ export function InvoiceProvider({ children }) {
     setCustomer((prev) => ({ ...prev, [key]: value }));
   }, []);
 
+  /** Fill the invoice's customer from a customer-book entry. */
+  const applyCustomer = useCallback((entry) => {
+    setCustomer({
+      name: entry.name || "",
+      address: entry.address || "",
+      gstin: entry.gstin || "",
+      phone: entry.phone || "",
+      email: entry.email || "",
+    });
+  }, []);
+
   const updateInvoiceMeta = useCallback((key, value) => {
     setInvoiceMeta((prev) => ({ ...prev, [key]: value }));
   }, []);
 
   const addLineItem = useCallback((item) => {
-    const qtn = Number(item.qtn);
-    const unitPrice = Number(item.unitPrice);
-    const gst = Number(item.gst || 0);
-    const discount = Number(item.discount || 0);
-    const totalAmount = calculateLineTotal(qtn, unitPrice, gst, discount);
-    const totalTaxableAmount = calculateLineTotalTaxableAmount(qtn, unitPrice);
-    const totalGSTValue = calculateLineTotalGSTvalue(qtn, unitPrice, gst);
-
     setLineItems((prev) => [
       ...prev,
-      {
+      withLineTotals({
         id: crypto.randomUUID(),
         desc: item.desc,
-        qtn,
-        unitPrice,
-        gst,
-        totalAmount,
-        totalTaxableAmount,
-        totalGSTValue,
-      },
+        qtn: Number(item.qtn),
+        unitPrice: Number(item.unitPrice),
+        gst: Number(item.gst || 0),
+      }),
     ]);
   }, []);
 
   const updateLineItem = useCallback((id, key, value) => {
     setLineItems((prev) =>
-      prev.map((item) => {
-        if (item.id !== id) return item;
-
-        const updated = { ...item, [key]: value };
-        updated.totalAmount = calculateLineTotal(
-          key === "qtn" ? value : updated.qtn,
-          key === "unitPrice" ? value : updated.unitPrice,
-          key === "gst" ? value : updated.gst,
-        );
-        updated.totalGSTValue = calculateLineTotalGSTvalue(
-          key === "qtn" ? value : updated.qtn,
-          key === "unitPrice" ? value : updated.unitPrice,
-          key === "gst" ? value : updated.gst,
-        );
-        updated.totalTaxableAmount = calculateLineTotalTaxableAmount(
-          key === "qtn" ? value : updated.qtn,
-          key === "unitPrice" ? value : updated.unitPrice,
-        );
-        return updated;
-      }),
+      prev.map((item) =>
+        item.id === id ? withLineTotals({ ...item, [key]: value }) : item,
+      ),
     );
   }, []);
 
@@ -151,22 +172,92 @@ export function InvoiceProvider({ children }) {
     setLineItems((prev) => prev.filter((item) => item.id !== id));
   }, []);
 
-  const createNewInvoice = useCallback(() => {
-    setInvoiceMeta(createDefaultInvoiceMeta());
+  const createNewInvoice = useCallback(async () => {
+    const invoiceNumber = await peekInvoiceNumber();
+    setInvoiceMeta(createDefaultInvoiceMeta(invoiceNumber));
     setLineItems([]);
+    setInvoiceId(null);
+    setStatus("draft");
     setShowPreview(false);
   }, []);
 
-  const flashSaveMessage = useCallback(() => {
-    setSaveMessage("Saved");
-    const timer = setTimeout(() => setSaveMessage(""), 2000);
-    return () => clearTimeout(timer);
+  /** Load a saved invoice into the editor. Resolves to false if not found. */
+  const openInvoice = useCallback(async (id) => {
+    const saved = await repository.getInvoice(id);
+    if (!saved) return false;
+
+    setBusiness(saved.business);
+    setBank(saved.bank);
+    setCustomer(saved.customer);
+    setInvoiceMeta(saved.invoiceMeta);
+    setLineItems(saved.lineItems);
+    setInvoiceId(saved.id);
+    setStatus(saved.status);
+    setShowPreview(false);
+    return true;
   }, []);
 
+  /** Persist the current invoice to the repository (insert or update). */
+  const saveInvoice = useCallback(async () => {
+    const errors = validateInvoiceForExport({ business, lineItems });
+    if (errors.length) {
+      flashMessage(errors[0], "error");
+      return { ok: false, error: errors.join("\n") };
+    }
+
+    try {
+      const saved = await repository.saveInvoice({
+        id: invoiceId,
+        status,
+        business,
+        bank,
+        customer,
+        invoiceMeta,
+        lineItems,
+        totals: summary,
+      });
+      setInvoiceId(saved.id);
+      flashMessage("Invoice saved");
+      return { ok: true, invoice: saved };
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Could not save the invoice.";
+      flashMessage(message, "error");
+      return { ok: false, error: message };
+    }
+  }, [
+    business,
+    bank,
+    customer,
+    invoiceMeta,
+    lineItems,
+    invoiceId,
+    status,
+    summary,
+    flashMessage,
+  ]);
+
   const persistNow = useCallback(() => {
-    saveInvoiceState({ business, bank, customer, invoiceMeta, lineItems });
-    flashSaveMessage();
-  }, [business, bank, customer, invoiceMeta, lineItems, flashSaveMessage]);
+    saveInvoiceState({
+      business,
+      bank,
+      customer,
+      invoiceMeta,
+      lineItems,
+      invoiceId,
+      status,
+    });
+    flashMessage("Saved");
+  }, [
+    business,
+    bank,
+    customer,
+    invoiceMeta,
+    lineItems,
+    invoiceId,
+    status,
+    flashMessage,
+  ]);
 
   const invoiceData = useMemo(
     () => ({
@@ -199,21 +290,28 @@ export function InvoiceProvider({ children }) {
       customer,
       invoiceMeta,
       lineItems,
+      invoiceId,
+      status,
+      setStatus,
       showPreview,
       setShowPreview,
       totalAmount,
       totalTaxableAmount,
       totalGSTValue,
       saveMessage,
+      saveMessageTone,
       invoiceData,
       updateBusiness,
       updateBank,
       updateCustomer,
+      applyCustomer,
       updateInvoiceMeta,
       addLineItem,
       updateLineItem,
       removeLineItem,
       createNewInvoice,
+      openInvoice,
+      saveInvoice,
       persistNow,
     }),
     [
@@ -223,20 +321,26 @@ export function InvoiceProvider({ children }) {
       customer,
       invoiceMeta,
       lineItems,
+      invoiceId,
+      status,
       showPreview,
       totalAmount,
       totalTaxableAmount,
       totalGSTValue,
       saveMessage,
+      saveMessageTone,
       invoiceData,
       updateBusiness,
       updateBank,
       updateCustomer,
+      applyCustomer,
       updateInvoiceMeta,
       addLineItem,
       updateLineItem,
       removeLineItem,
       createNewInvoice,
+      openInvoice,
+      saveInvoice,
       persistNow,
     ],
   );
