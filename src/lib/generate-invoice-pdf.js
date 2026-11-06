@@ -9,7 +9,7 @@ export { validateInvoiceForExport } from "./invoice-calc";
 
 /**
  * Exports every `[data-invoice-page]` inside the invoice document as one A4 PDF
- * page. Pagination (and the repeated header/footer) is decided by
+ * page (the last page is only as tall as its content). Pagination (and the repeated header/footer) is decided by
  * `InvoiceDocument`, so preview, print and PDF always match.
  */
 export async function generateInvoicePdfFromElement(root, invoiceMeta) {
@@ -20,7 +20,6 @@ export async function generateInvoicePdfFromElement(root, invoiceMeta) {
 
   const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
   const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
 
   for (let index = 0; index < pages.length; index += 1) {
     const canvas = await html2canvas(pages[index], {
@@ -30,6 +29,9 @@ export async function generateInvoicePdfFromElement(root, invoiceMeta) {
       backgroundColor: "#ffffff",
     });
 
+    // The last page is only as tall as its content, so keep its aspect ratio.
+    const imageHeight = (canvas.height * pageWidth) / canvas.width;
+
     if (index > 0) pdf.addPage();
     pdf.addImage(
       canvas.toDataURL("image/png", 1.0),
@@ -37,7 +39,7 @@ export async function generateInvoicePdfFromElement(root, invoiceMeta) {
       0,
       0,
       pageWidth,
-      pageHeight,
+      imageHeight,
     );
   }
 

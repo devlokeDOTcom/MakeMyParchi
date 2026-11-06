@@ -101,7 +101,7 @@ function InvoiceCustomer({ customer, invoiceMeta }) {
           {customer.email ? <p>Email: {customer.email}</p> : null}
         </div>
       </div>
-      <div className="flex flex-col w-fit h-full text-xs">
+      <div className="flex flex-col w-fit h-full text-right text-xs">
         {invoiceMeta.memoNo ? (
           <p className="mt-2">
             <span className="text-black/50">Order Memo no.</span>
@@ -182,13 +182,13 @@ const STANDARD_COLUMNS = [
 
 const BOOK_COLUMNS = [
   { label: "SL No.", width: 34, align: "text-left" },
-  { label: "Description", align: "text-left" },
+  { label: "Book Name", align: "text-left" },
   { label: "Author Name", width: 84, align: "text-left" },
   { label: "Publishers", width: 84, align: "text-left" },
   { label: "Quantity", width: 50, align: "text-center" },
-  { label: "Unit Price", width: 68, align: "text-right" },
+  { label: "Unit Price", width: 80, align: "text-right" },
   { label: "Amount", width: 84, align: "text-right" },
-  { label: "Discount", width: 72, align: "text-right" },
+  { label: "Discount", width: 60, align: "text-right" },
   { label: "Total Amount", width: 98, align: "text-right" },
 ];
 
@@ -221,20 +221,18 @@ function BookRow({ item, number }) {
       <td className="p-2 break-words">{item.author || "—"}</td>
       <td className="p-2 break-words">{item.publisher || "—"}</td>
       <td className="p-2 text-center">{item.qtn}</td>
-      <td className="p-2 text-right">₹ {formatCurrency(item.unitPrice)}</td>
-      <td className="p-2 text-right">₹ {line.amount.toFixed(2)}</td>
-      <td className="p-2 text-right">
-        {toNumber(item.discount) ? (
-          <>
-            ₹ {line.discountValue.toFixed(2)}
-            <br />
-            <span className="text-black/40">({toNumber(item.discount)}%)</span>
-          </>
-        ) : (
-          "—"
-        )}
+      <td className="p-2 text-right whitespace-nowrap">
+        ₹ {formatCurrency(item.unitPrice)}
       </td>
-      <td className="p-2 text-right">₹ {line.total.toFixed(2)}</td>
+      <td className="p-2 text-right whitespace-nowrap">
+        ₹ {line.amount.toFixed(2)}
+      </td>
+      <td className="p-2 text-right">
+        {toNumber(item.discount) ? `${toNumber(item.discount)}%` : "—"}
+      </td>
+      <td className="p-2 text-right whitespace-nowrap">
+        ₹ {line.total.toFixed(2)}
+      </td>
     </>
   );
 }
@@ -304,9 +302,7 @@ function InvoiceItemsTable({
                 <td className="p-3 text-right border-r whitespace-nowrap">
                   ₹ {summary.amount.toFixed(2)}
                 </td>
-                <td className="p-3 text-right border-r whitespace-nowrap">
-                  ₹ {summary.discount.toFixed(2)}
-                </td>
+                <td className="p-3 border-r"></td>
               </>
             ) : (
               <>
@@ -528,7 +524,8 @@ export function InvoiceDocument({
               className="flex flex-col overflow-hidden bg-white"
               style={{
                 width: PAGE_WIDTH,
-                height: PAGE_HEIGHT,
+                height: isLast ? undefined : PAGE_HEIGHT,
+                maxHeight: PAGE_HEIGHT,
                 padding: PAGE_PADDING,
               }}
             >
@@ -539,7 +536,7 @@ export function InvoiceDocument({
                   invoiceMeta={invoiceMeta}
                 />
               ) : null}
-              <div className="min-h-0 flex-1">
+              <div className={cn("min-h-0", !isLast && "flex-1")}>
                 <InvoiceItemsTable
                   rows={rows}
                   startIndex={pageStarts[pageIndex]}

@@ -44,7 +44,7 @@ const STANDARD_HEADERS = [
 
 const BOOK_HEADERS = [
   { label: "SL No." },
-  { label: "Description", className: "items-start" },
+  { label: "Book Name", className: "items-start" },
   { label: "Author Name", className: "text-center" },
   { label: "Publishers", className: "text-center" },
   { label: "Quantity", className: "text-center min-w-[50px]" },
