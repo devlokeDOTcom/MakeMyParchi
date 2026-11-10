@@ -95,7 +95,7 @@ export default function CustomersPage() {
   };
 
   return (
-    <div className="flex flex-col flex-1 font-sans p-4 mx-auto max-w-6xl w-full gap-5">
+    <div className="flex flex-col flex-1 font-sans p-3 sm:p-4 pb-24 md:pb-4 mx-auto max-w-6xl w-full gap-5">
       <AppNav />
       <div className="flex gap-2 text-2xl items-center">
         <AddressBookIcon size={40} weight="light" />
@@ -171,7 +171,55 @@ export default function CustomersPage() {
         {error ? <p className="text-xs text-red-700">{error}</p> : null}
       </div>
 
-      <div className="w-full bg-white p-4 border border-black/10 shadow">
+      <div className="w-full bg-white p-3 sm:p-4 border border-black/10 shadow">
+        {/* Phones: one card per customer, no sideways scrolling. */}
+        <div className="flex flex-col gap-3 lg:hidden">
+          {customers.length === 0 ? (
+            <p className="p-6 text-center text-sm text-black/40">
+              {loaded ? "No customers saved yet." : "Loading…"}
+            </p>
+          ) : (
+            customers.map((customer) => (
+              <div
+                key={customer.id}
+                className="flex items-start justify-between gap-2 border border-black/10 p-3"
+              >
+                <div className="min-w-0 text-sm">
+                  <p className="font-semibold">{customer.name}</p>
+                  {customer.gstin ? (
+                    <p className="text-xs text-black/60">GSTIN {customer.gstin}</p>
+                  ) : null}
+                  {customer.phone ? (
+                    <p className="text-xs text-black/60">{customer.phone}</p>
+                  ) : null}
+                  {customer.email ? (
+                    <p className="truncate text-xs text-black/60">{customer.email}</p>
+                  ) : null}
+                </div>
+                <div className="flex shrink-0 gap-1">
+                  <Button
+                    size="icon"
+                    variant="secondary"
+                    aria-label="Edit customer"
+                    onClick={() => handleEdit(customer)}
+                  >
+                    <PencilSimpleIcon size={15} />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="destructive"
+                    aria-label="Delete customer"
+                    onClick={() => handleDelete(customer)}
+                  >
+                    <TrashIcon size={15} />
+                  </Button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="hidden lg:block">
         <Table>
           <TableHeader className="bg-black/[3%]">
             <TableRow>
@@ -221,6 +269,7 @@ export default function CustomersPage() {
             )}
           </TableBody>
         </Table>
+        </div>
       </div>
     </div>
   );

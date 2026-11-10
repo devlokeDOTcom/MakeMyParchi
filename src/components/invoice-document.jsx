@@ -17,28 +17,28 @@ export const INVOICE_PAGE_SELECTOR = "[data-invoice-page]";
 
 const PAGE_WIDTH = "210mm";
 const PAGE_HEIGHT = "297mm";
-const PAGE_PADDING = 32;
+const PAGE_PADDING = 28;
 // Safety margin so rounding differences never push a row past the footer.
 const BODY_BUFFER = 8;
 
 function InvoiceHeader({ business, invoiceMeta }) {
   return (
-    <header className="flex justify-between gap-6 border-b border-black/10 pb-6 mb-6">
-      <section className="w-1/2 flex flex-col justify-between">
+    <header className="flex justify-between gap-6 border-b border-black/10 pb-3 mb-3">
+      <section className="w-1/2 flex flex-col">
         <div className="flex flex-col w-full">
-          <h2 className="text-4xl font-bold">
+          <h2 className="text-3xl font-bold leading-tight">
             {business.name || "Your Business"}
           </h2>
           {business.description ? (
             <p className="text-black/40 text-xs">{business.description}</p>
           ) : null}
           {business.address ? (
-            <p className="text-black/70 whitespace-pre-wrap">
+            <p className="text-black/70 text-xs whitespace-pre-wrap">
               {business.address}
             </p>
           ) : null}
         </div>
-        <div className="mt-3 space-y-1 text-black/60">
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-black/60">
           {business.gstin ? (
             <p>
               <span className="font-bold">GSTIN: </span>
@@ -62,21 +62,23 @@ function InvoiceHeader({ business, invoiceMeta }) {
         <p className="text-lg font-bold tracking-wide">
           <span>Tax Invoice</span>
         </p>
-        <p className="mt-3">
-          <span className="text-black/50">Invoice No.</span>
-          <br />
-          {invoiceMeta.invoiceNumber || "—"}
-        </p>
-        <p className="mt-2">
-          <span className="text-black/50">Date</span>
-          <br />
-          {formatDate(invoiceMeta.invoiceDate)}
-        </p>
-        <p className="mt-2">
-          <span className="text-black/50">Due Date</span>
-          <br />
-          {formatDate(invoiceMeta.dueDate)}
-        </p>
+        <div className="mt-2 flex flex-col items-end gap-1.5 text-xs">
+          <p>
+            <span className="text-black/50">Invoice No.</span>
+            <br />
+            {invoiceMeta.invoiceNumber || "—"}
+          </p>
+          <p>
+            <span className="text-black/50">Date</span>
+            <br />
+            {formatDate(invoiceMeta.invoiceDate)}
+          </p>
+          <p>
+            <span className="text-black/50">Due Date</span>
+            <br />
+            {formatDate(invoiceMeta.dueDate)}
+          </p>
+        </div>
       </section>
     </header>
   );
@@ -84,9 +86,9 @@ function InvoiceHeader({ business, invoiceMeta }) {
 
 function InvoiceCustomer({ customer, invoiceMeta }) {
   return (
-    <section className="mb-6 w-full flex justify-between">
+    <section className="mb-3 w-full flex justify-between">
       <div className="w-[400px] pr-4">
-        <p className="text-xs uppercase tracking-wider text-black/50 mb-2">
+        <p className="text-xs uppercase tracking-wider text-black/50 mb-1">
           Bill To
         </p>
         <p className="font-semibold text-sm">{customer.name || "Customer"}</p>
@@ -95,7 +97,7 @@ function InvoiceCustomer({ customer, invoiceMeta }) {
             {customer.address}
           </p>
         ) : null}
-        <div className="mt-4 space-y-1 text-black/60 text-xs">
+        <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-black/60 text-xs">
           {customer.gstin ? <p>GSTIN: {customer.gstin}</p> : null}
           {customer.phone ? <p>Phone: {customer.phone}</p> : null}
           {customer.email ? <p>Email: {customer.email}</p> : null}
@@ -103,13 +105,13 @@ function InvoiceCustomer({ customer, invoiceMeta }) {
       </div>
       <div className="flex flex-col w-fit h-full text-right text-xs">
         {invoiceMeta.memoNo ? (
-          <p className="mt-2">
+          <p className="mb-1">
             <span className="text-black/50">Order Memo no.</span>
             <br />
             {invoiceMeta.memoNo}
           </p>
         ) : null}
-        <p className="mt-2">
+        <p>
           <span className="text-black/50">Order Date</span>
           <br />
           {formatDate(invoiceMeta.orderDate)}
@@ -121,15 +123,15 @@ function InvoiceCustomer({ customer, invoiceMeta }) {
 
 function InvoiceFooter({ bank, pageNumber, pageCount, isLast }) {
   return (
-    <footer className="mt-4">
+    <footer className="mt-3">
       {isLast ? (
       <div className="w-full flex gap-10">
         {(bank.bankName || bank.accountNo || bank.ifsc) ? (
-          <section className="w-1/2">
-            <p className="text-xs uppercase tracking-wider text-black/50 mb-2">
+          <section className="w-2/3">
+            <p className="text-xs uppercase tracking-wider text-black/50 mb-1">
               Bank Details
             </p>
-            <div className="grid grid-cols-1 gap-1 text-black/70">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-black/70">
               {bank.bankName ? <p>Bank: {bank.bankName}</p> : null}
               {bank.accountName ? (
                 <p>Account Name: {bank.accountName}</p>
@@ -141,27 +143,27 @@ function InvoiceFooter({ bank, pageNumber, pageCount, isLast }) {
             </div>
           </section>
         ) : null}
-        <div className="w-1/2 flex flex-col justify-end text-xs">
-          <div className="w-full flex justify-end py-4">
-            <p className="border-y py-1 w-fit px-10 italic text-xs font-medium text-black/50">
+        <div className="flex-1 flex flex-col justify-end text-xs">
+          <div className="w-full flex justify-end py-1">
+            <p className="border-y py-1 w-fit px-6 italic text-xs font-medium text-black/50">
               Authority Signature
             </p>
           </div>
         </div>
       </div>
       ) : null}
-      <div className="w-full mt-4">
-        <p className="text-slate-500 text-sm w-full mb-2 italic">
+      <div className="w-full mt-3">
+        <p className="text-slate-500 text-xs w-full mb-1 italic">
           {"This is Challan cum Tax invoice. No separate Challan is required"}
         </p>
-        <p className="text-black/30 text-xs">
+        <p className="text-black/30 text-[10px] leading-snug">
           {
             "**Remarks** This invoice is valid only with an authorized signature and is issued in accordance with applicable GST laws and regulations. Company seal/stamp may not be required in all cases as per digital invoicing and business policies. After full payment, the seller is bound to sign all copies of the invoice generated."
           }
         </p>
       </div>
       {pageCount > 1 ? (
-        <p className="mt-3 text-right text-[10px] text-black/40">
+        <p className="mt-1 text-right text-[10px] text-black/40">
           Page {pageNumber} of {pageCount}
         </p>
       ) : null}
@@ -196,18 +198,18 @@ function StandardRow({ item, number }) {
   const line = calculateItemAmounts(item, "standard");
   return (
     <>
-      <td className="p-2 text-center">{number}</td>
-      <td className="p-2 break-words">{item.desc}</td>
-      <td className="p-2 text-center">{item.qtn}</td>
-      <td className="p-2 text-right">₹ {formatCurrency(item.unitPrice)}</td>
-      <td className="p-2 text-center">
+      <td className="px-2 py-[3px] text-center">{number}</td>
+      <td className="px-2 py-[3px] break-words">{item.desc}</td>
+      <td className="px-2 py-[3px] text-center">{item.qtn}</td>
+      <td className="px-2 py-[3px] text-right">₹ {formatCurrency(item.unitPrice)}</td>
+      <td className="px-2 py-[3px] text-center">
         {item.qtn && item.unitPrice ? `₹ ${line.taxable.toFixed(2)}` : "—"}
       </td>
-      <td className="p-2 text-center">{item.gst ? `${item.gst}%` : "—"}</td>
-      <td className="p-2 text-center">
+      <td className="px-2 py-[3px] text-center">{item.gst ? `${item.gst}%` : "—"}</td>
+      <td className="px-2 py-[3px] text-center">
         {item.gst ? `₹ ${line.gstValue.toFixed(2)}` : "—"}
       </td>
-      <td className="p-2 text-right">₹ {line.total.toFixed(2)}</td>
+      <td className="px-2 py-[3px] text-right">₹ {line.total.toFixed(2)}</td>
     </>
   );
 }
@@ -216,21 +218,21 @@ function BookRow({ item, number }) {
   const line = calculateItemAmounts(item, "book");
   return (
     <>
-      <td className="p-2 text-center">{number}</td>
-      <td className="p-2 break-words">{item.desc}</td>
-      <td className="p-2 break-words">{item.author || "—"}</td>
-      <td className="p-2 break-words">{item.publisher || "—"}</td>
-      <td className="p-2 text-center">{item.qtn}</td>
-      <td className="p-2 text-right whitespace-nowrap">
+      <td className="px-2 py-[3px] text-center">{number}</td>
+      <td className="px-2 py-[3px] break-words">{item.desc}</td>
+      <td className="px-2 py-[3px] break-words">{item.author || "—"}</td>
+      <td className="px-2 py-[3px] break-words">{item.publisher || "—"}</td>
+      <td className="px-2 py-[3px] text-center">{item.qtn}</td>
+      <td className="px-2 py-[3px] text-right whitespace-nowrap">
         ₹ {formatCurrency(item.unitPrice)}
       </td>
-      <td className="p-2 text-right whitespace-nowrap">
+      <td className="px-2 py-[3px] text-right whitespace-nowrap">
         ₹ {line.amount.toFixed(2)}
       </td>
-      <td className="p-2 text-right">
+      <td className="px-2 py-[3px] text-right">
         {toNumber(item.discount) ? `${toNumber(item.discount)}%` : "—"}
       </td>
-      <td className="p-2 text-right whitespace-nowrap">
+      <td className="px-2 py-[3px] text-right whitespace-nowrap">
         ₹ {line.total.toFixed(2)}
       </td>
     </>
@@ -263,7 +265,7 @@ function InvoiceItemsTable({
       <thead>
         <tr className="bg-black/[3%] border-y border-black/10">
           {columns.map(({ label, align }) => (
-            <th key={label} className={cn("p-2", align)}>
+            <th key={label} className={cn("px-2 py-1.5", align)}>
               {label}
             </th>
           ))}
@@ -294,56 +296,56 @@ function InvoiceItemsTable({
       {showTotals ? (
         <tfoot>
           <tr className="border-t border-black/10 font-semibold">
-            <td colSpan={isBook ? 6 : 4} className="p-3 text-right border-r">
+            <td colSpan={isBook ? 6 : 4} className="px-3 py-1.5 text-right border-r">
               Total :
             </td>
             {isBook ? (
               <>
-                <td className="p-3 text-right border-r whitespace-nowrap">
+                <td className="px-3 py-1.5 text-right border-r whitespace-nowrap">
                   ₹ {summary.amount.toFixed(2)}
                 </td>
-                <td className="p-3 border-r"></td>
+                <td className="px-3 py-1.5 border-r"></td>
               </>
             ) : (
               <>
-                <td className="p-3 text-center border-r whitespace-nowrap">
+                <td className="px-3 py-1.5 text-center border-r whitespace-nowrap">
                   ₹ {summary.taxable.toFixed(2)}
                 </td>
-                <td className="p-3 text-right"></td>
-                <td className="p-3 text-center border-x whitespace-nowrap">
+                <td className="px-3 py-1.5 text-right"></td>
+                <td className="px-3 py-1.5 text-center border-x whitespace-nowrap">
                   ₹ {summary.gstValue.toFixed(2)}
                 </td>
               </>
             )}
-            <td className="p-3 text-right whitespace-nowrap">
+            <td className="px-3 py-1.5 text-right whitespace-nowrap">
               ₹ {summary.total.toFixed(2)}
             </td>
           </tr>
           <tr className="border-y">
             <td
               colSpan={columnCount - 1}
-              className="p-3 text-right italic border-r"
+              className="px-3 py-1.5 text-right italic border-r"
             >
               Round off :
             </td>
-            <td className="p-3 text-right italic whitespace-nowrap">
+            <td className="px-3 py-1.5 text-right italic whitespace-nowrap">
               {formatRoundOff(summary.roundOff)}
             </td>
           </tr>
           <tr className="border-y">
             <td
               colSpan={isBook ? 6 : 5}
-              className="p-3 text-slate-500 border-r"
+              className="px-3 py-1.5 text-slate-500 border-r"
             >
               Amount in words :{" "}
               <span className="text-right text-slate-900 pl-5">
                 {amountWords} rupees only
               </span>
             </td>
-            <td colSpan={2} className="p-3 text-right font-bold border-r">
+            <td colSpan={2} className="px-3 py-1.5 text-right font-bold border-r">
               Amount to pay :
             </td>
-            <td className="p-3 text-right font-bold text-[13px] whitespace-nowrap">
+            <td className="px-3 py-1.5 text-right font-bold text-[13px] whitespace-nowrap">
               ₹ {summary.payable.toFixed(2)}
             </td>
           </tr>
@@ -422,7 +424,34 @@ export function InvoiceDocument({
     [lineItems, template],
   );
   const sandboxRef = useRef(null);
+  const rootRef = useRef(null);
+  const pagesRef = useRef(null);
   const [pageBreaks, setPageBreaks] = useState(null);
+  // Shrinks the fixed-size A4 pages to fit narrow screens (display only).
+  const [fit, setFit] = useState({ scale: 1, height: 0 });
+
+  useEffect(() => {
+    const root = rootRef.current;
+    const pagesEl = pagesRef.current;
+    if (!root || !pagesEl || typeof ResizeObserver === "undefined") return;
+
+    const update = () => {
+      const available = root.clientWidth;
+      const scale =
+        available > 0 ? Math.min(1, available / pagesEl.offsetWidth) : 1;
+      setFit((prev) =>
+        prev.scale === scale && prev.height === pagesEl.offsetHeight
+          ? prev
+          : { scale, height: pagesEl.offsetHeight },
+      );
+    };
+
+    const observer = new ResizeObserver(update);
+    observer.observe(root);
+    observer.observe(pagesEl);
+    update();
+    return () => observer.disconnect();
+  }, []);
 
   // Measure a hidden, unpaginated copy and work out where pages break.
   useEffect(() => {
@@ -473,10 +502,11 @@ export function InvoiceDocument({
 
   return (
     <div
+      ref={rootRef}
       id={INVOICE_DOCUMENT_ROOT_ID}
       data-invoice-document
       className={cn(
-        "flex w-full flex-col gap-6 overflow-x-auto text-sm text-black [color-scheme:light] print:gap-0 print:overflow-visible",
+        "w-full overflow-hidden text-sm text-black [color-scheme:light] print:overflow-visible",
         className,
       )}
     >
@@ -509,6 +539,24 @@ export function InvoiceDocument({
         </div>
       </div>
 
+      <div
+        data-invoice-scaler
+        className="mx-auto print:!h-auto print:!w-full"
+        style={{
+          width: `calc((${PAGE_WIDTH} + 2px) * ${fit.scale})`,
+          height: fit.scale < 1 && fit.height ? fit.height * fit.scale : undefined,
+        }}
+      >
+      <div
+        ref={pagesRef}
+        data-invoice-pages
+        className="flex flex-col gap-6 print:gap-0 print:!transform-none"
+        style={{
+          width: `calc(${PAGE_WIDTH} + 2px)`,
+          transform: fit.scale < 1 ? `scale(${fit.scale})` : undefined,
+          transformOrigin: "top left",
+        }}
+      >
       {pages.map((indices, pageIndex) => {
         const rows = indices.map((index) => lineItems[index]);
         const isFirst = pageIndex === 0;
@@ -556,6 +604,8 @@ export function InvoiceDocument({
           </div>
         );
       })}
+      </div>
+      </div>
     </div>
   );
 }

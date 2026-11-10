@@ -22,6 +22,27 @@ import { repository } from "@/lib/repositories";
 
 const InvoiceContext = createContext(null);
 
+/** Stable fingerprint of everything a saved invoice contains. */
+function fingerprint({
+  business,
+  bank,
+  customer,
+  invoiceMeta,
+  lineItems,
+  status,
+  template,
+}) {
+  return JSON.stringify([
+    business,
+    bank,
+    customer,
+    invoiceMeta,
+    lineItems,
+    status,
+    template,
+  ]);
+}
+
 async function peekInvoiceNumber() {
   try {
     return await repository.peekNextInvoiceNumber();
@@ -42,6 +63,8 @@ export function InvoiceProvider({ children }) {
   const [status, setStatus] = useState(initial.status);
   const [template, setTemplate] = useState(initial.template);
   const [showPreview, setShowPreview] = useState(false);
+  // Fingerprint of the last saved/loaded state; differs from now = unsaved.
+  const [savedKey, setSavedKey] = useState(null);
   const [saveMessage, setSaveMessage] = useState("");
   const [saveMessageTone, setSaveMessageTone] = useState("success");
   const messageTimer = useRef(null);
@@ -58,11 +81,22 @@ export function InvoiceProvider({ children }) {
       setBusiness(stored.business);
       setBank(stored.bank);
       setCustomer(stored.customer);
-      setInvoiceMeta({ ...stored.invoiceMeta, invoiceNumber });
+      const hydratedMeta = { ...stored.invoiceMeta, invoiceNumber };
+      setInvoiceMeta(hydratedMeta);
       setLineItems(stored.lineItems);
       setInvoiceId(stored.invoiceId);
       setStatus(stored.status);
       setTemplate(stored.template);
+      // A restored draft that was never saved counts as unsaved work.
+      setSavedKey(
+        stored.invoiceId
+          ? fingerprint({ ...stored, invoiceMeta: hydratedMeta })
+          : fingerprint({
+              ...stored,
+              invoiceMeta: hydratedMeta,
+              lineItems: [],
+            }),
+      );
       setHydrated(true);
     })();
 
@@ -167,12 +201,24 @@ export function InvoiceProvider({ children }) {
 
   const createNewInvoice = useCallback(async () => {
     const invoiceNumber = await peekInvoiceNumber();
-    setInvoiceMeta(createDefaultInvoiceMeta(invoiceNumber));
+    const freshMeta = createDefaultInvoiceMeta(invoiceNumber);
+    setInvoiceMeta(freshMeta);
     setLineItems([]);
     setInvoiceId(null);
     setStatus("draft");
     setShowPreview(false);
-  }, []);
+    setSavedKey(
+      fingerprint({
+        business,
+        bank,
+        customer,
+        invoiceMeta: freshMeta,
+        lineItems: [],
+        status: "draft",
+        template,
+      }),
+    );
+  }, [business, bank, customer, template]);
 
   /** Load a saved invoice into the editor. Resolves to false if not found. */
   const openInvoice = useCallback(async (id) => {
@@ -188,6 +234,12 @@ export function InvoiceProvider({ children }) {
     setStatus(saved.status);
     setTemplate(saved.template || "standard");
     setShowPreview(false);
+    setSavedKey(
+      fingerprint({
+        ...saved,
+        template: saved.template || "standard",
+      }),
+    );
     return true;
   }, []);
 
@@ -212,6 +264,17 @@ export function InvoiceProvider({ children }) {
         totals: summary,
       });
       setInvoiceId(saved.id);
+      setSavedKey(
+        fingerprint({
+          business,
+          bank,
+          customer,
+          invoiceMeta,
+          lineItems,
+          status,
+          template,
+        }),
+      );
       flashMessage("Invoice saved");
       return { ok: true, invoice: saved };
     } catch (error) {
@@ -257,6 +320,33 @@ export function InvoiceProvider({ children }) {
     flashMessage,
   ]);
 
+  const dirty = useMemo(
+    () =>
+      hydrated &&
+      savedKey !== null &&
+      savedKey !==
+        fingerprint({
+          business,
+          bank,
+          customer,
+          invoiceMeta,
+          lineItems,
+          status,
+          template,
+        }),
+    [
+      hydrated,
+      savedKey,
+      business,
+      bank,
+      customer,
+      invoiceMeta,
+      lineItems,
+      status,
+      template,
+    ],
+  );
+
   const invoiceData = useMemo(
     () => ({
       business,
@@ -291,6 +381,8 @@ export function InvoiceProvider({ children }) {
       invoiceId,
       status,
       template,
+      dirty,
+      summary,
       setStatus,
       setTemplate,
       showPreview,
@@ -324,6 +416,8 @@ export function InvoiceProvider({ children }) {
       invoiceId,
       status,
       template,
+      dirty,
+      summary,
       showPreview,
       totalAmount,
       totalTaxableAmount,

@@ -27,6 +27,21 @@ export async function generateInvoicePdfFromElement(root, invoiceMeta) {
       useCORS: true,
       logging: false,
       backgroundColor: "#ffffff",
+      // The on-screen copy may be scaled down to fit small screens; capture
+      // the pages at their true A4 size.
+      onclone: (clonedDocument) => {
+        clonedDocument
+          .querySelectorAll("[data-invoice-scaler]")
+          .forEach((el) => {
+            el.style.width = "auto";
+            el.style.height = "auto";
+          });
+        clonedDocument
+          .querySelectorAll("[data-invoice-pages]")
+          .forEach((el) => {
+            el.style.transform = "none";
+          });
+      },
     });
 
     // The last page is only as tall as its content, so keep its aspect ratio.

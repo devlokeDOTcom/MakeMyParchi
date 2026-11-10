@@ -32,11 +32,41 @@ import { cn } from "@/lib/utils";
 
 const FILTERS = ["all", "draft", "sent", "overdue", "paid"];
 
+const SORTS = [
+  { value: "newest", label: "Newest first" },
+  { value: "oldest", label: "Oldest first" },
+  { value: "amount-desc", label: "Amount: high to low" },
+  { value: "amount-asc", label: "Amount: low to high" },
+  { value: "due", label: "Due date: soonest" },
+];
+
+function sortRows(rows, sort) {
+  const by = {
+    newest: (a, b) =>
+      (b.invoice.invoiceMeta.invoiceDate || "").localeCompare(
+        a.invoice.invoiceMeta.invoiceDate || "",
+      ) || (b.invoice.updatedAt || "").localeCompare(a.invoice.updatedAt || ""),
+    oldest: (a, b) =>
+      (a.invoice.invoiceMeta.invoiceDate || "").localeCompare(
+        b.invoice.invoiceMeta.invoiceDate || "",
+      ),
+    "amount-desc": (a, b) =>
+      (b.invoice.totals?.payable || 0) - (a.invoice.totals?.payable || 0),
+    "amount-asc": (a, b) =>
+      (a.invoice.totals?.payable || 0) - (b.invoice.totals?.payable || 0),
+    due: (a, b) =>
+      (a.invoice.invoiceMeta.dueDate || "9999").localeCompare(
+        b.invoice.invoiceMeta.dueDate || "9999",
+      ),
+  };
+  return [...rows].sort(by[sort]);
+}
+
 function StatCard({ label, value }) {
   return (
-    <div className="flex-1 min-w-[180px] border border-black/10 bg-white p-4 shadow">
+    <div className="flex-1 sm:min-w-[180px] min-w-0 border border-black/10 bg-white p-2.5 sm:p-4 shadow">
       <p className="text-xs text-black/50">{label}</p>
-      <p className="mt-1 text-xl font-semibold">₹ {formatCurrency(value)}</p>
+      <p className="mt-1 text-sm sm:text-xl font-semibold">₹ {formatCurrency(value)}</p>
     </div>
   );
 }
@@ -49,6 +79,7 @@ export default function InvoicesPage() {
   const [error, setError] = useState("");
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
+  const [sort, setSort] = useState("newest");
 
   const refresh = useCallback(async () => {
     try {
@@ -104,15 +135,35 @@ export default function InvoicesPage() {
     };
   }, [rows]);
 
-  const visible = rows.filter(({ invoice, displayStatus }) => {
-    if (filter !== "all" && displayStatus !== filter) return false;
-    const needle = query.trim().toLowerCase();
-    if (!needle) return true;
-    return (
-      invoice.invoiceMeta.invoiceNumber.toLowerCase().includes(needle) ||
-      (invoice.customer?.name || "").toLowerCase().includes(needle)
-    );
-  });
+  const counts = useMemo(() => {
+    const result = { all: rows.length };
+    rows.forEach(({ displayStatus }) => {
+      result[displayStatus] = (result[displayStatus] || 0) + 1;
+    });
+    return result;
+  }, [rows]);
+
+  const visible = useMemo(() => {
+    const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const filtered = rows.filter(({ invoice, displayStatus }) => {
+      if (filter !== "all" && displayStatus !== filter) return false;
+      if (!words.length) return true;
+      const haystack = [
+        invoice.invoiceMeta.invoiceNumber,
+        invoice.invoiceMeta.memoNo,
+        invoice.customer?.name,
+        invoice.customer?.gstin,
+        STATUS_LABEL[displayStatus],
+        String(invoice.totals?.payable ?? ""),
+      ]
+        .join(" ")
+        .toLowerCase();
+      return words.every((word) => haystack.includes(word));
+    });
+    return sortRows(filtered, sort);
+  }, [rows, filter, query, sort]);
+
+  const hasFilters = filter !== "all" || query.trim() !== "";
 
   const run = async (action) => {
     try {
@@ -160,14 +211,14 @@ export default function InvoicesPage() {
   };
 
   return (
-    <div className="flex flex-col flex-1 font-sans p-4 mx-auto max-w-6xl w-full gap-5">
+    <div className="flex flex-col flex-1 font-sans p-3 sm:p-4 pb-24 md:pb-4 mx-auto max-w-6xl w-full gap-5">
       <AppNav />
       <div className="flex gap-2 text-2xl items-center">
         <ListChecksIcon size={40} weight="light" />
         Invoices
       </div>
 
-      <div className="flex flex-wrap gap-4">
+      <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap sm:gap-4">
         <StatCard label="Outstanding" value={stats.outstanding} />
         <StatCard label="Overdue" value={stats.overdue} />
         <StatCard label="Paid" value={stats.paid} />
@@ -185,26 +236,161 @@ export default function InvoicesPage() {
                 onClick={() => setFilter(value)}
               >
                 {value === "all" ? "All" : STATUS_LABEL[value]}
+                <span className="ml-1 opacity-60">{counts[value] || 0}</span>
               </Button>
             ))}
           </div>
-          <Input
-            className="w-full sm:w-64"
-            placeholder="Search invoice no. or customer"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
+          <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+            <div className="relative min-w-[200px] flex-1 sm:w-64 sm:flex-none">
+              <Input
+                type="search"
+                aria-label="Search invoices"
+                placeholder="Search no., customer, memo, amount…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </div>
+            <select
+              aria-label="Sort invoices"
+              className="h-8 border border-input bg-transparent px-2 text-xs outline-none"
+              value={sort}
+              onChange={(e) => setSort(e.target.value)}
+            >
+              {SORTS.map(({ value, label }) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between text-xs text-black/50">
+          <span aria-live="polite">
+            Showing {visible.length} of {invoices.length} invoice
+            {invoices.length === 1 ? "" : "s"}
+          </span>
+          {hasFilters ? (
+            <button
+              type="button"
+              className="underline hover:text-black"
+              onClick={() => {
+                setFilter("all");
+                setQuery("");
+              }}
+            >
+              Clear filters
+            </button>
+          ) : null}
         </div>
 
         {error ? <p className="text-xs text-red-700">{error}</p> : null}
 
+        {/* Phones: one card per invoice, no sideways scrolling. */}
+        <div className="flex flex-col gap-3 lg:hidden">
+          {visible.length === 0 ? (
+            <p className="p-6 text-center text-sm text-black/40">
+              {!loaded
+                ? "Loading…"
+                : invoices.length === 0
+                  ? "No saved invoices yet. Create one and press Save."
+                  : "No invoices match. Try fewer words or Clear filters."}
+            </p>
+          ) : (
+            visible.map((row) => {
+              const { invoice, displayStatus } = row;
+              return (
+                <div
+                  key={invoice.id}
+                  className="border border-black/10 bg-white p-3 shadow-sm"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-semibold">
+                        {invoice.invoiceMeta.invoiceNumber}
+                      </p>
+                      <p className="truncate text-sm text-black/60">
+                        {invoice.customer?.name || "—"}
+                      </p>
+                    </div>
+                    <span
+                      className={cn(
+                        "shrink-0 px-2 py-0.5 text-xs font-medium",
+                        STATUS_BADGE_CLASS[displayStatus],
+                      )}
+                    >
+                      {STATUS_LABEL[displayStatus]}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex items-end justify-between text-xs text-black/50">
+                    <span>
+                      {formatDate(invoice.invoiceMeta.invoiceDate)} · due{" "}
+                      {formatDate(invoice.invoiceMeta.dueDate)}
+                    </span>
+                    <span className="text-base font-semibold text-black">
+                      ₹ {formatCurrency(invoice.totals?.payable)}
+                    </span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-[1fr_auto_auto_auto] gap-2">
+                    {invoice.status === "paid" ? (
+                      <Button
+                        variant="secondary"
+                        onClick={() => handleSetStatus(row, "sent")}
+                      >
+                        Mark unpaid
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="secondary"
+                        onClick={() =>
+                          handleSetStatus(
+                            row,
+                            invoice.status === "draft" ? "sent" : "paid",
+                          )
+                        }
+                      >
+                        {invoice.status === "draft" ? "Mark sent" : "Mark paid"}
+                      </Button>
+                    )}
+                    <Button
+                      size="icon"
+                      variant="secondary"
+                      aria-label="Open invoice"
+                      onClick={() => handleOpen(invoice.id)}
+                    >
+                      <PencilSimpleIcon size={15} />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="secondary"
+                      aria-label="Duplicate invoice"
+                      onClick={() => handleDuplicate(row)}
+                    >
+                      <CopyIcon size={15} />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="destructive"
+                      aria-label="Delete invoice"
+                      onClick={() => handleDelete(row)}
+                    >
+                      <TrashIcon size={15} />
+                    </Button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        <div className="hidden lg:block">
         <Table>
           <TableHeader className="bg-black/[3%]">
             <TableRow>
               <TableHead>Invoice No.</TableHead>
               <TableHead>Customer</TableHead>
-              <TableHead>Date</TableHead>
-              <TableHead>Due Date</TableHead>
+              <TableHead className="hidden sm:table-cell">Date</TableHead>
+              <TableHead className="hidden md:table-cell">Due Date</TableHead>
               <TableHead className="text-right">Amount</TableHead>
               <TableHead className="text-center">Status</TableHead>
               <TableHead className="text-center">Actions</TableHead>
@@ -217,8 +403,8 @@ export default function InvoicesPage() {
                   {!loaded
                     ? "Loading…"
                     : invoices.length === 0
-                      ? "No saved invoices yet. Create one and press Save Invoice."
-                      : "No invoices match your filters."}
+                      ? "No saved invoices yet. Create one and press Save Invoice (Ctrl S)."
+                      : "No invoices match. Try fewer words or Clear filters."}
                 </TableCell>
               </TableRow>
             ) : (
@@ -230,10 +416,10 @@ export default function InvoicesPage() {
                       {invoice.invoiceMeta.invoiceNumber}
                     </TableCell>
                     <TableCell>{invoice.customer?.name || "—"}</TableCell>
-                    <TableCell>
+                    <TableCell className="hidden sm:table-cell">
                       {formatDate(invoice.invoiceMeta.invoiceDate)}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden md:table-cell">
                       {formatDate(invoice.invoiceMeta.dueDate)}
                     </TableCell>
                     <TableCell className="text-right">
@@ -311,6 +497,7 @@ export default function InvoicesPage() {
             )}
           </TableBody>
         </Table>
+        </div>
       </div>
     </div>
   );
