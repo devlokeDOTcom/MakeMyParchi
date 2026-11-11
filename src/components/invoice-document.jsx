@@ -38,7 +38,7 @@ function InvoiceHeader({ business, invoiceMeta }) {
             </p>
           ) : null}
         </div>
-        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-black/60">
+        <div className="mt-2 space-y-0.5 text-xs text-black/60">
           {business.gstin ? (
             <p>
               <span className="font-bold">GSTIN: </span>
@@ -97,7 +97,7 @@ function InvoiceCustomer({ customer, invoiceMeta }) {
             {customer.address}
           </p>
         ) : null}
-        <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-black/60 text-xs">
+        <div className="mt-1 space-y-0.5 text-black/60 text-xs">
           {customer.gstin ? <p>GSTIN: {customer.gstin}</p> : null}
           {customer.phone ? <p>Phone: {customer.phone}</p> : null}
           {customer.email ? <p>Email: {customer.email}</p> : null}
@@ -127,11 +127,11 @@ function InvoiceFooter({ bank, pageNumber, pageCount, isLast }) {
       {isLast ? (
       <div className="w-full flex gap-10">
         {(bank.bankName || bank.accountNo || bank.ifsc) ? (
-          <section className="w-2/3">
+          <section className="w-1/2">
             <p className="text-xs uppercase tracking-wider text-black/50 mb-1">
               Bank Details
             </p>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-xs text-black/70">
+            <div className="grid grid-cols-1 gap-y-0.5 text-xs text-black/70">
               {bank.bankName ? <p>Bank: {bank.bankName}</p> : null}
               {bank.accountName ? (
                 <p>Account Name: {bank.accountName}</p>
@@ -198,18 +198,18 @@ function StandardRow({ item, number }) {
   const line = calculateItemAmounts(item, "standard");
   return (
     <>
-      <td className="px-2 py-[3px] text-center">{number}</td>
-      <td className="px-2 py-[3px] break-words">{item.desc}</td>
-      <td className="px-2 py-[3px] text-center">{item.qtn}</td>
-      <td className="px-2 py-[3px] text-right">₹ {formatCurrency(item.unitPrice)}</td>
-      <td className="px-2 py-[3px] text-center">
+      <td className="px-2 py-0.5 text-center">{number}</td>
+      <td className="px-2 py-0.5 break-words">{item.desc}</td>
+      <td className="px-2 py-0.5 text-center">{item.qtn}</td>
+      <td className="px-2 py-0.5 text-right">₹ {formatCurrency(item.unitPrice)}</td>
+      <td className="px-2 py-0.5 text-center">
         {item.qtn && item.unitPrice ? `₹ ${line.taxable.toFixed(2)}` : "—"}
       </td>
-      <td className="px-2 py-[3px] text-center">{item.gst ? `${item.gst}%` : "—"}</td>
-      <td className="px-2 py-[3px] text-center">
+      <td className="px-2 py-0.5 text-center">{item.gst ? `${item.gst}%` : "—"}</td>
+      <td className="px-2 py-0.5 text-center">
         {item.gst ? `₹ ${line.gstValue.toFixed(2)}` : "—"}
       </td>
-      <td className="px-2 py-[3px] text-right">₹ {line.total.toFixed(2)}</td>
+      <td className="px-2 py-0.5 text-right">₹ {line.total.toFixed(2)}</td>
     </>
   );
 }
@@ -218,21 +218,21 @@ function BookRow({ item, number }) {
   const line = calculateItemAmounts(item, "book");
   return (
     <>
-      <td className="px-2 py-[3px] text-center">{number}</td>
-      <td className="px-2 py-[3px] break-words">{item.desc}</td>
-      <td className="px-2 py-[3px] break-words">{item.author || "—"}</td>
-      <td className="px-2 py-[3px] break-words">{item.publisher || "—"}</td>
-      <td className="px-2 py-[3px] text-center">{item.qtn}</td>
-      <td className="px-2 py-[3px] text-right whitespace-nowrap">
+      <td className="px-2 py-0.5 text-center">{number}</td>
+      <td className="px-2 py-0.5 break-words">{item.desc}</td>
+      <td className="px-2 py-0.5 break-words">{item.author || "—"}</td>
+      <td className="px-2 py-0.5 break-words">{item.publisher || "—"}</td>
+      <td className="px-2 py-0.5 text-center">{item.qtn}</td>
+      <td className="px-2 py-0.5 text-right whitespace-nowrap">
         ₹ {formatCurrency(item.unitPrice)}
       </td>
-      <td className="px-2 py-[3px] text-right whitespace-nowrap">
+      <td className="px-2 py-0.5 text-right whitespace-nowrap">
         ₹ {line.amount.toFixed(2)}
       </td>
-      <td className="px-2 py-[3px] text-right">
+      <td className="px-2 py-0.5 text-right">
         {toNumber(item.discount) ? `${toNumber(item.discount)}%` : "—"}
       </td>
-      <td className="px-2 py-[3px] text-right whitespace-nowrap">
+      <td className="px-2 py-0.5 text-right whitespace-nowrap">
         ₹ {line.total.toFixed(2)}
       </td>
     </>
@@ -296,56 +296,56 @@ function InvoiceItemsTable({
       {showTotals ? (
         <tfoot>
           <tr className="border-t border-black/10 font-semibold">
-            <td colSpan={isBook ? 6 : 4} className="px-3 py-1.5 text-right border-r">
+            <td colSpan={isBook ? 6 : 4} className="px-3 py-1 text-right border-r">
               Total :
             </td>
             {isBook ? (
               <>
-                <td className="px-3 py-1.5 text-right border-r whitespace-nowrap">
+                <td className="px-3 py-1 text-right border-r whitespace-nowrap">
                   ₹ {summary.amount.toFixed(2)}
                 </td>
-                <td className="px-3 py-1.5 border-r"></td>
+                <td className="px-3 py-1 border-r"></td>
               </>
             ) : (
               <>
-                <td className="px-3 py-1.5 text-center border-r whitespace-nowrap">
+                <td className="px-3 py-1 text-center border-r whitespace-nowrap">
                   ₹ {summary.taxable.toFixed(2)}
                 </td>
-                <td className="px-3 py-1.5 text-right"></td>
-                <td className="px-3 py-1.5 text-center border-x whitespace-nowrap">
+                <td className="px-3 py-1 text-right"></td>
+                <td className="px-3 py-1 text-center border-x whitespace-nowrap">
                   ₹ {summary.gstValue.toFixed(2)}
                 </td>
               </>
             )}
-            <td className="px-3 py-1.5 text-right whitespace-nowrap">
+            <td className="px-3 py-1 text-right whitespace-nowrap">
               ₹ {summary.total.toFixed(2)}
             </td>
           </tr>
           <tr className="border-y">
             <td
               colSpan={columnCount - 1}
-              className="px-3 py-1.5 text-right italic border-r"
+              className="px-3 py-1 text-right italic border-r"
             >
               Round off :
             </td>
-            <td className="px-3 py-1.5 text-right italic whitespace-nowrap">
+            <td className="px-3 py-1 text-right italic whitespace-nowrap">
               {formatRoundOff(summary.roundOff)}
             </td>
           </tr>
           <tr className="border-y">
             <td
               colSpan={isBook ? 6 : 5}
-              className="px-3 py-1.5 text-slate-500 border-r"
+              className="px-3 py-1 text-slate-500 border-r"
             >
               Amount in words :{" "}
               <span className="text-right text-slate-900 pl-5">
                 {amountWords} rupees only
               </span>
             </td>
-            <td colSpan={2} className="px-3 py-1.5 text-right font-bold border-r">
+            <td colSpan={2} className="px-3 py-1 text-right font-bold border-r">
               Amount to pay :
             </td>
-            <td className="px-3 py-1.5 text-right font-bold text-[13px] whitespace-nowrap">
+            <td className="px-3 py-1 text-right font-bold text-[13px] whitespace-nowrap">
               ₹ {summary.payable.toFixed(2)}
             </td>
           </tr>
